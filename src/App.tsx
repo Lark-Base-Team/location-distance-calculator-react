@@ -64,7 +64,7 @@ export default function App() {
     []
   );
   const [numberFields, setNumberFields] = useState<INumberFieldMeta[]>([]);
-  const [, forceUpdate] = useState({}); // Dummy state for forcing re-render
+  const [distanceType, setDistanceType] = useState<string>("driving");
 
   // Effect 1: 加载数据表列表和初始选中项
   useEffect(() => {
@@ -170,8 +170,20 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTableId]); // 依赖 selectedTableId
 
-  // Effect 4: 响应 distanceType 变化，更新表单并处理策略字段
-  // (已移除)
+  // 新增 Effect: 确保 formApi 初始化后，distanceType 状态与表单值同步
+  useEffect(() => {
+    if (formApi.current) {
+      const currentFormDistanceType = formApi.current.getValue("distanceType");
+      if (currentFormDistanceType && currentFormDistanceType !== distanceType) {
+        setDistanceType(currentFormDistanceType);
+        console.log(
+          "Synced distanceType state with form value:",
+          currentFormDistanceType
+        );
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [distanceType]); // 移除 formApi.current 从依赖项，因为它是 ref
 
   // 更新 ref 当 isStopping 变化时
   useEffect(() => {
@@ -523,18 +535,18 @@ export default function App() {
             transitStrategy: "0",
           }}
           onValueChange={(values, changedValues) => {
-            // --- Simplified state sync ---
             if (changedValues.hasOwnProperty("distanceType")) {
               const newDistanceType = values.distanceType;
               console.log("Form distanceType changed to:", newDistanceType);
+              if (newDistanceType) {
+                setDistanceType(newDistanceType);
+              }
+
               if (newDistanceType !== "driving") {
                 formApi.current?.setValue("drivingStrategy", undefined);
               } else {
-                // 当切换回驾车模式时，总是将策略重置为 "高德推荐"
                 formApi.current?.setValue("drivingStrategy", "32");
               }
-              // Force re-render to update conditional UI for strategies
-              forceUpdate({});
             }
           }}
         >
@@ -601,7 +613,7 @@ export default function App() {
             ]}
           ></Form.Select>
 
-          {formApi.current?.getValues().distanceType === "driving" && (
+          {distanceType === "driving" && (
             <Form.Select
               field="drivingStrategy"
               label={t("select_driving_strategy", "选择驾车策略")}
@@ -707,7 +719,7 @@ export default function App() {
             ></Form.Select>
           )}
 
-          {formApi.current?.getValues().distanceType === "transit" && (
+          {distanceType === "transit" && (
             <Form.Select
               field="transitStrategy"
               label={t("select_transit_strategy", "选择公交策略")}
