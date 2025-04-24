@@ -183,8 +183,8 @@ export default function App() {
     if (distanceType !== "driving") {
       formApi.current.setValue("drivingStrategy", undefined);
     } else {
-      // 如果切换回驾车模式，可以考虑设置默认策略，或保持不变让用户选择
-      // formApi.current.setValue('drivingStrategy', '32'); // 设置默认高德推荐
+      // 当切换回驾车模式时，总是将策略重置为 "高德推荐"
+      formApi.current.setValue("drivingStrategy", "32");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [distanceType]); // 依赖 distanceType
