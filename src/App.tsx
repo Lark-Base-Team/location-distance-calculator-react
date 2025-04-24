@@ -30,13 +30,21 @@ import {
   DEFAULT_API_KEY,
   CalculateDistanceResult,
 } from "./utils/geo";
+import {
+  DistanceMode,
+  FeishuLocationField,
+  isValidLocationField,
+  getCoordinateString,
+  RecordUpdate,
+  RecordUpdateFields,
+} from "./types";
 
 // 定义表单值的类型 (可以根据需要补充)
 interface FormValues {
   table?: string;
   latitudeField?: string;
   longitudeField?: string;
-  distanceType?: string;
+  distanceType?: DistanceMode;
   drivingStrategy?: string;
   transitStrategy?: string;
   outputField_distance?: string;
@@ -344,17 +352,7 @@ export default function App() {
               const endCell = record.fields[longitudeField.id];
 
               // Validation logic remains the same
-              const isValidLocation = (
-                cell: any
-              ): cell is {
-                location: string;
-                cityname?: string;
-                lat?: number;
-                lon?: number;
-              } =>
-                cell &&
-                typeof cell === "object" &&
-                typeof cell.location === "string";
+              const isValidLocation = isValidLocationField;
 
               if (
                 !isValidLocation(startCell) ||
@@ -370,14 +368,8 @@ export default function App() {
               }
 
               // Parameter construction remains the same
-              const originString =
-                startCell.lon !== undefined && startCell.lat !== undefined
-                  ? `${startCell.lon},${startCell.lat}`
-                  : startCell.location;
-              const destinationString =
-                endCell.lon !== undefined && endCell.lat !== undefined
-                  ? `${endCell.lon},${endCell.lat}`
-                  : endCell.location;
+              const originString = getCoordinateString(startCell);
+              const destinationString = getCoordinateString(endCell);
               const originCity = startCell.cityname;
               const destinationCity = endCell.cityname;
 
@@ -403,7 +395,7 @@ export default function App() {
               );
 
               // Update collection remains the same
-              const recordUpdateFields: Record<string, any> = {};
+              const recordUpdateFields: RecordUpdateFields = {};
               let updated = false;
 
               if (
@@ -427,7 +419,7 @@ export default function App() {
                 updates.push({
                   recordId: recordId,
                   fields: recordUpdateFields,
-                });
+                } as RecordUpdate);
                 successCount++;
               } else {
                 if (!outputFieldDistance && !outputFieldDuration) {

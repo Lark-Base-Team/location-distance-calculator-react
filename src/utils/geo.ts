@@ -1,4 +1,14 @@
 import { Toast } from "@douyinfe/semi-ui"; // 可选，如果要在 utils 中提示
+import {
+  GaodeApiBaseResponse,
+  GaodeGeocodingV3Response,
+  GaodeDistanceV3Response,
+  GaodeDrivingV5Response,
+  GaodeWalkingV5Response,
+  GaodeBicyclingV5Response,
+  GaodeTransitV5Response,
+  TravelMode,
+} from "../types/gaode";
 
 // 高德 API Key (替换为你自己的 Key，或者从配置/环境变量读取)
 // ！！！注意：直接硬编码 Key 在代码中存在安全风险，仅作示例！！！
@@ -40,7 +50,7 @@ async function getCitycodeFromCityName(
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    const data = await response.json();
+    const data = (await response.json()) as GaodeGeocodingV3Response;
     console.log(`[getCitycode] V3 Geocoding Response for "${cityName}":`, data);
 
     if (data.status === "1" && data.geocodes && data.geocodes.length > 0) {
@@ -107,7 +117,7 @@ export async function calculateDistance(
   destination: string,
   originCity: string | undefined, // 允许 undefined
   destinationCity: string | undefined, // 允许 undefined
-  mode: string,
+  mode: TravelMode,
   apiKey: string = DEFAULT_API_KEY, // 默认使用内置 Key
   strategy?: string // 设为可选
 ): Promise<CalculateDistanceResult> {
@@ -264,16 +274,23 @@ export async function calculateDistance(
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    const data = await response.json();
-    console.log("API Response:", data);
 
+    // 根据不同的模式，解析不同的响应数据
+    let data: GaodeApiBaseResponse;
     let distance: number | null = null;
     let duration: number | null = null;
 
     // --- v3 Distance API (direct only) ---
     if (mode === "direct") {
+      data = (await response.json()) as GaodeDistanceV3Response;
+      console.log("API Response:", data);
+
       // Removed walking from this block
-      if (data.status !== "1" || !data.results || data.results.length === 0) {
+      if (
+        data.status !== "1" ||
+        !(data as GaodeDistanceV3Response).results ||
+        (data as GaodeDistanceV3Response).results.length === 0
+      ) {
         // status 为 0 也可能表示失败，info 会提供原因
         throw new Error(
           `高德 API (v3 Distance) 错误: ${data.info || "未知错误"} (infocode: ${
@@ -281,16 +298,19 @@ export async function calculateDistance(
           })` // Updated error message slightly
         );
       }
-      distance = data.results[0].distance
-        ? Number(data.results[0].distance) / 1000
+      distance = (data as GaodeDistanceV3Response).results[0].distance
+        ? Number((data as GaodeDistanceV3Response).results[0].distance) / 1000
         : null;
       // V3 Distance API 'direct' (type=0) might not return duration, set to null
-      duration = data.results[0].duration
-        ? Number(data.results[0].duration) / 60
+      duration = (data as GaodeDistanceV3Response).results[0].duration
+        ? Number((data as GaodeDistanceV3Response).results[0].duration) / 60
         : null; // Keep duration parsing for now, maybe type=0 provides it?
     }
     // --- v5 Driving API ---
     else if (mode === "driving") {
+      data = (await response.json()) as GaodeDrivingV5Response;
+      console.log("API Response:", data);
+
       // v5版本status=1代表成功，但infocode=10000才代表成功
       if (data.status !== "1" || data.infocode !== "10000") {
         throw new Error(
@@ -299,12 +319,17 @@ export async function calculateDistance(
           })`
         );
       }
-      if (data.route && data.route.paths && data.route.paths.length > 0) {
-        distance = data.route.paths[0].distance
-          ? Number(data.route.paths[0].distance) / 1000
+      const drivingData = data as GaodeDrivingV5Response;
+      if (
+        drivingData.route &&
+        drivingData.route.paths &&
+        drivingData.route.paths.length > 0
+      ) {
+        distance = drivingData.route.paths[0].distance
+          ? Number(drivingData.route.paths[0].distance) / 1000
           : null;
-        duration = data.route.paths[0].cost?.duration
-          ? Number(data.route.paths[0].cost.duration) / 60
+        duration = drivingData.route.paths[0].cost?.duration
+          ? Number(drivingData.route.paths[0].cost.duration) / 60
           : null;
       } else {
         // 即使 infocode 是 10000，也可能没有路径（例如无法到达）
@@ -315,6 +340,9 @@ export async function calculateDistance(
     }
     // --- v5 Walking API (New block) ---
     else if (mode === "walking") {
+      data = (await response.json()) as GaodeWalkingV5Response;
+      console.log("API Response:", data);
+
       if (data.status !== "1" || data.infocode !== "10000") {
         throw new Error(
           `高德 API (v5 Walking) 错误: ${data.info || "未知错误"} (infocode: ${
@@ -322,13 +350,18 @@ export async function calculateDistance(
           })`
         );
       }
-      if (data.route && data.route.paths && data.route.paths.length > 0) {
-        distance = data.route.paths[0].distance
-          ? Number(data.route.paths[0].distance) / 1000
+      const walkingData = data as GaodeWalkingV5Response;
+      if (
+        walkingData.route &&
+        walkingData.route.paths &&
+        walkingData.route.paths.length > 0
+      ) {
+        distance = walkingData.route.paths[0].distance
+          ? Number(walkingData.route.paths[0].distance) / 1000
           : null;
         // Assuming V5 walking also uses cost.duration with show_fields=cost
-        duration = data.route.paths[0].cost?.duration
-          ? Number(data.route.paths[0].cost.duration) / 60
+        duration = walkingData.route.paths[0].cost?.duration
+          ? Number(walkingData.route.paths[0].cost.duration) / 60
           : null;
       } else {
         console.warn("步行模式未返回有效路径数据");
@@ -336,6 +369,9 @@ export async function calculateDistance(
     }
     // --- v5 Bicycling API (New block) ---
     else if (mode === "bicycling") {
+      data = (await response.json()) as GaodeBicyclingV5Response;
+      console.log("API Response:", data);
+
       if (data.status !== "1" || data.infocode !== "10000") {
         throw new Error(
           `高德 API (v5 Bicycling) 错误: ${
@@ -343,20 +379,28 @@ export async function calculateDistance(
           } (infocode: ${data.infocode})`
         );
       }
-      if (data.route && data.route.paths && data.route.paths.length > 0) {
-        distance = data.route.paths[0].distance
-          ? Number(data.route.paths[0].distance) / 1000
+      const bicyclingData = data as GaodeBicyclingV5Response;
+      if (
+        bicyclingData.route &&
+        bicyclingData.route.paths &&
+        bicyclingData.route.paths.length > 0
+      ) {
+        distance = bicyclingData.route.paths[0].distance
+          ? Number(bicyclingData.route.paths[0].distance) / 1000
           : null;
         // Assuming V5 bicycling also uses cost.duration with show_fields=cost
-        duration = data.route.paths[0].cost?.duration
-          ? Number(data.route.paths[0].cost.duration) / 60
+        duration = bicyclingData.route.paths[0].cost?.duration
+          ? Number(bicyclingData.route.paths[0].cost.duration) / 60
           : null;
       } else {
         console.warn("骑行模式未返回有效路径数据");
       }
     }
-    // --- v3 Transit API --- (Updated to V5 parsing logic)
+    // --- v5 Transit API --- (Updated to V5 parsing logic)
     else if (mode === "transit") {
+      data = (await response.json()) as GaodeTransitV5Response;
+      console.log("API Response:", data);
+
       if (data.status !== "1" || data.infocode !== "10000") {
         // Use V5 success check
         throw new Error(
@@ -365,9 +409,14 @@ export async function calculateDistance(
           })` // Updated error message to V5
         );
       }
+      const transitData = data as GaodeTransitV5Response;
       // Assuming V5 structure is similar to V3 for transits, but check docs if issues arise.
-      if (data.route && data.route.transits && data.route.transits.length > 0) {
-        const firstTransit = data.route.transits[0];
+      if (
+        transitData.route &&
+        transitData.route.transits &&
+        transitData.route.transits.length > 0
+      ) {
+        const firstTransit = transitData.route.transits[0];
         // 公交通常只关心总耗时
         // Try cost.duration first if available (from show_fields=cost)
         duration = firstTransit.cost?.duration
