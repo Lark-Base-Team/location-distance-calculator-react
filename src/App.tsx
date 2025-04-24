@@ -714,10 +714,7 @@ export default function App() {
             label={t("select_output_field_distance")}
             placeholder={t("select_output_field_distance_placeholder")}
             style={{ width: "100%" }}
-            optionList={[
-              { label: t("none_output"), value: undefined },
-              ...fieldMetaToOptions(numberFields),
-            ]}
+            optionList={[...fieldMetaToOptions(numberFields)]}
             disabled={!selectedTableId}
           ></Form.Select>
           <Form.Select
@@ -725,10 +722,7 @@ export default function App() {
             label={t("select_output_field_duration")}
             placeholder={t("select_output_field_duration_placeholder")}
             style={{ width: "100%" }}
-            optionList={[
-              { label: t("none_output"), value: undefined },
-              ...fieldMetaToOptions(numberFields),
-            ]}
+            optionList={[...fieldMetaToOptions(numberFields)]}
             disabled={!selectedTableId}
           ></Form.Select>
           <Form.Input
