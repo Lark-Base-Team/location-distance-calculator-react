@@ -1,6 +1,4 @@
-# 地理位置距离计算 (Location Distance Calculator) - React 版
-
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FVinfall%2Flocation-distance-calculator-react.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FVinfall%2Flocation-distance-calculator-react?ref=badge_shield)
+# 地理位置距离计算 (Location Distance Calculator)
 
 ⚡️ **简介**
 
@@ -71,5 +69,3 @@
     3.  在创建的应用下，点击 **添加 KEY**，输入 Key 名称（随意），服务平台选择 **Web 服务**。
     4.  将获取到的 Key 填入插件界面的 “自定义高德 API Key” 输入框，插件将优先使用您的 Key。
 - **飞书插件开发:** 了解更多关于飞书多维表格插件开发，请查阅 [官方 JS SDK 文档](https://lark-base-team.github.io/js-sdk-docs/zh/)。
-
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FVinfall%2Flocation-distance-calculator-react.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FVinfall%2Flocation-distance-calculator-react?ref=badge_large)
