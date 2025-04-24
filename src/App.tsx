@@ -85,14 +85,14 @@ export default function App() {
         setTableMetaList(metaList);
         if (selection?.tableId) {
           const initialTableId = selection.tableId;
-          // 直接设置 State
+          // Directly set State
           setSelectedTableId(initialTableId);
-          // 初始化表单值 - 无需 setTimeout
-          // formApi.current?.setValue('table', initialTableId); // 这将在 selectedTableId effect 中处理
+          // Initialize form value - no need for setTimeout
+          // formApi.current?.setValue('table', initialTableId); // This will be handled in the selectedTableId effect
         }
       } catch (error) {
         console.error("Error fetching initial data:", error);
-        Toast.error(t("error_fetching_tables", "获取数据表列表失败"));
+        Toast.error(t("error_fetching_tables"));
       }
     };
     fetchData();
@@ -105,8 +105,8 @@ export default function App() {
         console.log("Effect 2: No selectedTableId, clearing fields.");
         setLocationFields([]);
         setNumberFields([]);
-        // 确保 FormApi 可用时清空表单值
-        // 这部分逻辑移到下面的 selectedTableId effect 中处理，避免重复
+        // Ensure FormApi clears form values when available
+        // This logic moved to the selectedTableId effect below to avoid repetition
         return;
       }
       console.log("Effect 2: Starting field fetch, setting loading to true.");
@@ -131,20 +131,20 @@ export default function App() {
         console.log("Effect 2: Fields processed and set.");
       } catch (error) {
         console.error("Effect 2: Error fetching fields:", error);
-        Toast.error(t("error_fetching_fields", "获取字段列表失败"));
+        Toast.error(t("error_fetching_fields"));
         setLocationFields([]);
         setNumberFields([]);
       } finally {
         console.log(
           "Effect 2: Entering finally block, setting loading to false."
-        ); // 确认 finally 执行
+        ); // Confirm finally execution
         setLoading(false);
       }
     };
 
     fetchFields();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTableId]); // 移除 t, 只依赖 selectedTableId
+  }, [selectedTableId]); // Remove t, only depend on selectedTableId
 
   // Effect 3: 响应 selectedTableId 变化，更新表单并清空字段
   useEffect(() => {
@@ -211,7 +211,7 @@ export default function App() {
   const requestStop = useCallback(() => {
     console.log("Stop requested");
     setIsStopping(true);
-    Toast.info(t("stopping_process", "正在尝试停止..."));
+    Toast.info(t("stopping_process"));
   }, [t]);
 
   // Helper function to fetch all records using pagination
@@ -228,7 +228,7 @@ export default function App() {
     while (hasMore) {
       if (isStoppingRef.current) {
         console.log("Record fetching stopped by user.");
-        throw new Error("Process stopped during record fetch");
+        throw new Error(t("process_stopped_during_fetch"));
       }
       try {
         const res: IGetRecordsResponse = await table.getRecordsByPage({
@@ -244,10 +244,9 @@ export default function App() {
       } catch (error) {
         console.error("Error fetching records batch (ByPage):", error);
         throw new Error(
-          t(
-            "error_fetching_records_batch",
-            `获取记录批次时出错: ${(error as Error).message || String(error)}`
-          )
+          t("error_fetching_records_batch", {
+            errorMessage: (error as Error).message || String(error),
+          })
         );
       }
     }
@@ -261,20 +260,18 @@ export default function App() {
       setIsStopping(false);
       isStoppingRef.current = false;
 
-      // --- 输入验证 ---
+      // --- Input validation ---
       if (
         !values.table ||
         !values.latitudeField ||
         !values.longitudeField ||
-        !values.distanceType // 使用 values 中的 distanceType
+        !values.distanceType // Use distanceType from values
       ) {
-        Toast.error(t("form_incomplete_error", "请填写所有必填字段"));
+        Toast.error(t("form_incomplete_error"));
         return;
       }
       if (values.latitudeField === values.longitudeField) {
-        Toast.error(
-          t("latitude_longitude_field_error", "起点和终点不能是同一个字段")
-        );
+        Toast.error(t("latitude_longitude_field_error"));
         return;
       }
       if (
@@ -282,17 +279,13 @@ export default function App() {
         values.outputField_duration &&
         values.outputField_distance === values.outputField_duration
       ) {
-        Toast.error(
-          t("output_field_same_error", "距离和时间输出字段不能是同一个字段")
-        );
+        Toast.error(t("output_field_same_error"));
         return;
       }
 
       // Restore validation: Check if both output fields are unselected (undefined)
       if (!values.outputField_distance && !values.outputField_duration) {
-        Toast.error(
-          t("output_field_error", "请至少选择一个输出字段（距离或时间）")
-        );
+        Toast.error(t("output_field_error"));
         return;
       }
 
@@ -329,7 +322,7 @@ export default function App() {
         for (let i = 0; i < totalRecordCount; i += BATCH_SIZE) {
           if (isStoppingRef.current) {
             console.log("Processing stopped by user.");
-            Toast.warning(t("process_stopped", "处理已中止"));
+            Toast.warning(t("process_stopped"));
             break;
           }
 
@@ -437,11 +430,11 @@ export default function App() {
               console.error(`Error processing record ${recordId}:`, err);
               errorCount++;
               Notification.error({
-                title: t("record_error_title", "记录处理错误"),
-                content: t(
-                  "record_error_content",
-                  `记录 ID: ${recordId} 计算失败: ${err.message || err}`
-                ),
+                title: t("record_error_title"),
+                content: t("record_error_content", {
+                  recordId: recordId,
+                  errorMessage: err.message || String(err),
+                }),
                 duration: 5,
               });
               // Continue with the next record
@@ -458,9 +451,7 @@ export default function App() {
           // Check stop status before batch update
           if (isStoppingRef.current) {
             console.log("Stop requested before batch update.");
-            Toast.warning(
-              t("process_stopped_before_update", "处理已中止，部分数据未写入")
-            );
+            Toast.warning(t("process_stopped_before_update"));
             break; // Exit outer loop
           }
 
@@ -482,14 +473,13 @@ export default function App() {
       } catch (error: any) {
         console.error("Error during processing:", error);
         // Handle errors from getAllRecords or other initial setup
-        if (error.message === "Process stopped during record fetch") {
-          Toast.warning(t("process_stopped_during_fetch", "记录获取过程中止"));
+        if (error.message === t("process_stopped_during_fetch")) {
+          Toast.warning(t("process_stopped_during_fetch"));
         } else {
           Toast.error(
-            t(
-              "processing_error", // More generic error message
-              `处理时出错: ${error.message || error}`
-            )
+            t("processing_error", {
+              errorMessage: error.message || String(error),
+            })
           );
         }
       } finally {
@@ -500,13 +490,15 @@ export default function App() {
         const durationSeconds = ((endTime - startTime) / 1000).toFixed(2);
         console.log(`Processing finished in ${durationSeconds} seconds.`);
         if (isStoppingRef.current) {
-          Toast.info(t("process_manually_stopped", "处理已被用户停止"));
+          Toast.info(t("process_manually_stopped"));
         } else {
           Toast.success(
-            t(
-              "process_complete",
-              `处理完成！成功: ${successCount}, 失败: ${errorCount}, 跳过: ${skipCount}. 耗时: ${durationSeconds} 秒`
-            )
+            t("process_complete", {
+              successCount: successCount,
+              errorCount: errorCount,
+              skipCount: skipCount,
+              durationSeconds: durationSeconds,
+            })
           );
         }
       }
@@ -516,7 +508,7 @@ export default function App() {
 
   return (
     <main className="main">
-      <Spin spinning={loading} tip={t("processing_data", "处理中...")}>
+      <Spin spinning={loading} tip={t("processing_data")}>
         <Form<FormValues>
           labelPosition="top"
           onSubmit={handleSubmit}
@@ -543,17 +535,15 @@ export default function App() {
           }}
         >
           <Form.Slot>
-            <p>{t("text_description", "选择表格和字段，计算地理位置距离。")}</p>
-            <p>{t("text_description_2", "结果将写入指定的输出字段。")}</p>
+            <p>{t("text_description")}</p>
+            <p>{t("text_description_2")}</p>
           </Form.Slot>
           <Form.Select
             field="table"
-            label={t("select_table", "选择数据表")}
-            placeholder={t("select_table_placeholder", "请选择数据表")}
+            label={t("select_table")}
+            placeholder={t("select_table_placeholder")}
             style={{ width: "100%" }}
-            rules={[
-              { required: true, message: t("field_required", "此字段必填") },
-            ]}
+            rules={[{ required: true, message: t("field_required") }]}
             optionList={tableMetaList.map(({ name, id }) => ({
               label: name,
               value: id,
@@ -562,149 +552,114 @@ export default function App() {
           ></Form.Select>
           <Form.Select
             field="latitudeField"
-            label={t("select_latitude_field", "选择起点字段 (地理位置)")}
-            placeholder={t(
-              "select_latitude_field_placeholder",
-              "请选择起点地理位置字段"
-            )}
+            label={t("select_latitude_field")}
+            placeholder={t("select_latitude_field_placeholder")}
             style={{ width: "100%" }}
-            rules={[
-              { required: true, message: t("field_required", "此字段必填") },
-            ]}
+            rules={[{ required: true, message: t("field_required") }]}
             optionList={fieldMetaToOptions(locationFields)}
             disabled={!selectedTableId}
           ></Form.Select>
           <Form.Select
             field="longitudeField"
-            label={t("select_longitude_field", "选择终点字段 (地理位置)")}
-            placeholder={t(
-              "select_longitude_field_placeholder",
-              "请选择终点地理位置字段"
-            )}
+            label={t("select_longitude_field")}
+            placeholder={t("select_longitude_field_placeholder")}
             style={{ width: "100%" }}
-            rules={[
-              { required: true, message: t("field_required", "此字段必填") },
-            ]}
+            rules={[{ required: true, message: t("field_required") }]}
             optionList={fieldMetaToOptions(locationFields)}
             disabled={!selectedTableId}
           ></Form.Select>
           <Form.Select
             field="distanceType"
-            label={t("select_type", "选择距离模式")}
-            placeholder={t("select_type_placeholder", "请选择计算模式")}
+            label={t("select_type")}
+            placeholder={t("select_type_placeholder")}
             style={{ width: "100%" }}
-            rules={[
-              { required: true, message: t("field_required", "此字段必填") },
-            ]}
+            rules={[{ required: true, message: t("field_required") }]}
             optionList={[
-              { label: t("direct", "直线距离"), value: "direct" },
-              { label: t("driving", "驾车"), value: "driving" },
-              { label: t("walking", "步行"), value: "walking" },
-              { label: t("bicycling", "骑行"), value: "bicycling" },
-              { label: t("transit", "公交"), value: "transit" },
+              { label: t("direct"), value: "direct" },
+              { label: t("driving"), value: "driving" },
+              { label: t("walking"), value: "walking" },
+              { label: t("bicycling"), value: "bicycling" },
+              { label: t("transit"), value: "transit" },
             ]}
           ></Form.Select>
 
           {distanceType === "driving" && (
             <Form.Select
               field="drivingStrategy"
-              label={t("select_driving_strategy", "选择驾车策略")}
-              placeholder={t(
-                "select_driving_strategy_placeholder",
-                "选择驾车路线偏好"
-              )}
+              label={t("select_driving_strategy")}
+              placeholder={t("select_driving_strategy_placeholder")}
               style={{ width: "100%" }}
               optionList={[
                 {
-                  label: t("driving_strategy_speed_priority", "速度优先"),
+                  label: t("driving_strategy_speed_priority"),
                   value: "0",
                 },
                 {
-                  label: t("driving_strategy_cost_priority", "费用优先"),
+                  label: t("driving_strategy_cost_priority"),
                   value: "1",
                 },
                 {
-                  label: t("driving_strategy_conventional_fastest", "常规最快"),
+                  label: t("driving_strategy_conventional_fastest"),
                   value: "2",
                 },
                 {
-                  label: t(
-                    "driving_strategy_amap_recommended",
-                    "高德推荐 (默认)"
-                  ),
+                  label: t("driving_strategy_amap_recommended"),
                   value: "32",
                 },
                 {
-                  label: t("driving_strategy_avoid_congestion", "躲避拥堵"),
+                  label: t("driving_strategy_avoid_congestion"),
                   value: "33",
                 },
                 {
-                  label: t("driving_strategy_highway_priority", "高速优先"),
+                  label: t("driving_strategy_highway_priority"),
                   value: "34",
                 },
                 {
-                  label: t("driving_strategy_avoid_highway", "不走高速"),
+                  label: t("driving_strategy_avoid_highway"),
                   value: "35",
                 },
                 {
-                  label: t("driving_strategy_less_charge", "少收费"),
+                  label: t("driving_strategy_less_charge"),
                   value: "36",
                 },
                 {
-                  label: t("driving_strategy_main_road", "大路优先"),
+                  label: t("driving_strategy_main_road"),
                   value: "37",
                 },
                 {
-                  label: t("driving_strategy_speed_fastest", "速度最快"),
+                  label: t("driving_strategy_speed_fastest"),
                   value: "38",
                 },
                 {
                   label: t(
-                    "driving_strategy_avoid_congestion_highway_priority",
-                    "躲避拥堵+高速优先"
+                    "driving_strategy_avoid_congestion_highway_priority"
                   ),
                   value: "39",
                 },
                 {
-                  label: t(
-                    "driving_strategy_avoid_congestion_avoid_highway",
-                    "躲避拥堵+不走高速"
-                  ),
+                  label: t("driving_strategy_avoid_congestion_avoid_highway"),
                   value: "40",
                 },
                 {
-                  label: t(
-                    "driving_strategy_avoid_congestion_less_charge",
-                    "躲避拥堵+少收费"
-                  ),
+                  label: t("driving_strategy_avoid_congestion_less_charge"),
                   value: "41",
                 },
                 {
-                  label: t(
-                    "driving_strategy_less_charge_avoid_highway",
-                    "少收费+不走高速"
-                  ),
+                  label: t("driving_strategy_less_charge_avoid_highway"),
                   value: "42",
                 },
                 {
                   label: t(
-                    "driving_strategy_avoid_congestion_less_charge_avoid_highway",
-                    "躲避拥堵+少收费+不走高速"
+                    "driving_strategy_avoid_congestion_less_charge_avoid_highway"
                   ),
                   value: "43",
                 },
                 {
-                  label: t(
-                    "driving_strategy_avoid_congestion_main_road",
-                    "躲避拥堵+大路优先"
-                  ),
+                  label: t("driving_strategy_avoid_congestion_main_road"),
                   value: "44",
                 },
                 {
-                  label: t(
-                    "driving_strategy_avoid_congestion_speed_fastest",
-                    "躲避拥堵+速度最快"
-                  ),
+                  label: t("driving_strategy_avoid_congestion_speed_fastest"),
                   value: "45",
                 },
               ]}
@@ -714,46 +669,40 @@ export default function App() {
           {distanceType === "transit" && (
             <Form.Select
               field="transitStrategy"
-              label={t("select_transit_strategy", "选择公交策略")}
-              placeholder={t(
-                "select_transit_strategy_placeholder",
-                "选择公交路线偏好"
-              )}
+              label={t("select_transit_strategy")}
+              placeholder={t("select_transit_strategy_placeholder")}
               style={{ width: "100%" }}
               optionList={[
                 {
-                  label: t("transit_strategy_recommend_v5", "推荐模式 (默认)"),
+                  label: t("transit_strategy_recommend_v5"),
                   value: "0",
                 },
                 {
-                  label: t("transit_strategy_cheapest", "最经济模式"),
+                  label: t("transit_strategy_cheapest"),
                   value: "1",
                 },
                 {
-                  label: t("transit_strategy_least_transfer", "最少换乘模式"),
+                  label: t("transit_strategy_least_transfer"),
                   value: "2",
                 },
                 {
-                  label: t("transit_strategy_least_walk", "最少步行模式"),
+                  label: t("transit_strategy_least_walk"),
                   value: "3",
                 },
                 {
-                  label: t("transit_strategy_most_comfortable", "最舒适模式"),
+                  label: t("transit_strategy_most_comfortable"),
                   value: "4",
                 },
                 {
-                  label: t("transit_strategy_no_subway", "不乘地铁模式"),
+                  label: t("transit_strategy_no_subway"),
                   value: "5",
                 },
                 {
-                  label: t(
-                    "transit_strategy_subway_priority_v5",
-                    "地铁优先模式"
-                  ),
+                  label: t("transit_strategy_subway_priority_v5"),
                   value: "7",
                 },
                 {
-                  label: t("transit_strategy_shortest_time", "时间短模式"),
+                  label: t("transit_strategy_shortest_time"),
                   value: "8",
                 },
               ]}
@@ -762,39 +711,30 @@ export default function App() {
 
           <Form.Select
             field="outputField_distance"
-            label={t("select_output_field_distance", "输出距离字段 (数字)")}
-            placeholder={t(
-              "select_output_field_distance_placeholder",
-              "选择用于存储距离(km)的数字字段"
-            )}
+            label={t("select_output_field_distance")}
+            placeholder={t("select_output_field_distance_placeholder")}
             style={{ width: "100%" }}
             optionList={[
-              { label: t("none_output", "不输出"), value: undefined },
+              { label: t("none_output"), value: undefined },
               ...fieldMetaToOptions(numberFields),
             ]}
             disabled={!selectedTableId}
           ></Form.Select>
           <Form.Select
             field="outputField_duration"
-            label={t("select_output_field_duration", "输出时间字段 (数字)")}
-            placeholder={t(
-              "select_output_field_duration_placeholder",
-              "选择用于存储时间(分钟)的数字字段"
-            )}
+            label={t("select_output_field_duration")}
+            placeholder={t("select_output_field_duration_placeholder")}
             style={{ width: "100%" }}
             optionList={[
-              { label: t("none_output", "不输出"), value: undefined },
+              { label: t("none_output"), value: undefined },
               ...fieldMetaToOptions(numberFields),
             ]}
             disabled={!selectedTableId}
           ></Form.Select>
           <Form.Input
             field="customApiKey"
-            label={t("custom_api_key_label", "自定义高德 API Key (Web服务)")}
-            placeholder={t(
-              "custom_api_key_placeholder",
-              "输入您的高德 Web 服务 API Key (可选)"
-            )}
+            label={t("custom_api_key_label")}
+            placeholder={t("custom_api_key_placeholder")}
             style={{ width: "100%" }}
           />
         </Form>
@@ -807,7 +747,7 @@ export default function App() {
           disabled={loading}
           style={{ flexGrow: 1 }}
         >
-          {t("submit", "开始计算")}
+          {t("submit")}
         </Button>
         {loading && (
           <Button
@@ -816,7 +756,7 @@ export default function App() {
             onClick={requestStop}
             style={{ flexShrink: 0 }}
           >
-            {t("stop", "停止")}
+            {t("stop")}
           </Button>
         )}
       </div>
