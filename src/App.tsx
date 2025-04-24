@@ -229,12 +229,6 @@ export default function App() {
         Toast.error(t("form_incomplete_error", "请填写所有必填字段"));
         return;
       }
-      if (!values.outputField_distance && !values.outputField_duration) {
-        Toast.error(
-          t("output_field_error", "请至少选择一个输出字段（距离或时间）")
-        );
-        return;
-      }
       if (values.latitudeField === values.longitudeField) {
         Toast.error(
           t("latitude_longitude_field_error", "起点和终点不能是同一个字段")
@@ -243,10 +237,19 @@ export default function App() {
       }
       if (
         values.outputField_distance &&
+        values.outputField_duration &&
         values.outputField_distance === values.outputField_duration
       ) {
         Toast.error(
           t("output_field_same_error", "距离和时间输出字段不能是同一个字段")
+        );
+        return;
+      }
+
+      // Restore validation: Check if both output fields are unselected (undefined)
+      if (!values.outputField_distance && !values.outputField_duration) {
+        Toast.error(
+          t("output_field_error", "请至少选择一个输出字段（距离或时间）")
         );
         return;
       }
@@ -388,8 +391,15 @@ export default function App() {
                 });
                 successCount++;
               } else {
-                console.log(`Record ${recordId}: No valid results to update.`);
-                // 如果没有计算出任何有效结果，也算作跳过？或者单独计数？暂计入 skip
+                if (!outputFieldDistance && !outputFieldDuration) {
+                  console.log(
+                    `Skipping record ${recordId}: No output fields selected.`
+                  );
+                } else {
+                  console.log(
+                    `Record ${recordId}: No valid results to update for selected output fields.`
+                  );
+                }
                 skipCount++;
               }
             } catch (err: any) {
@@ -588,7 +598,10 @@ export default function App() {
               "选择用于存储距离(km)的数字字段"
             )}
             style={{ width: "100%" }}
-            optionList={fieldMetaToOptions(numberFields)}
+            optionList={[
+              { label: t("none_output", "不输出"), value: undefined },
+              ...fieldMetaToOptions(numberFields),
+            ]}
             disabled={!selectedTableId}
           ></Form.Select>
           <Form.Select
@@ -599,7 +612,10 @@ export default function App() {
               "选择用于存储时间(分钟)的数字字段"
             )}
             style={{ width: "100%" }}
-            optionList={fieldMetaToOptions(numberFields)}
+            optionList={[
+              { label: t("none_output", "不输出"), value: undefined },
+              ...fieldMetaToOptions(numberFields),
+            ]}
             disabled={!selectedTableId}
           ></Form.Select>
           <Form.Input
