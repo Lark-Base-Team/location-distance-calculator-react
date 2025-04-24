@@ -214,6 +214,47 @@ export default function App() {
     Toast.info(t("stopping_process", "正在尝试停止..."));
   }, [t]);
 
+  // Helper function to fetch all records using pagination
+  const getAllRecords = async (table: any): Promise<IRecord[]> => {
+    let allRecords: IRecord[] = [];
+    let pageToken: string | undefined = undefined;
+    let hasMore = true;
+    const BATCH_FETCH_SIZE = 200;
+
+    console.log(
+      `Starting to fetch all records using ByPage (batch size: ${BATCH_FETCH_SIZE})...`
+    );
+
+    while (hasMore) {
+      if (isStoppingRef.current) {
+        console.log("Record fetching stopped by user.");
+        throw new Error("Process stopped during record fetch");
+      }
+      try {
+        const res: IGetRecordsResponse = await table.getRecordsByPage({
+          pageSize: BATCH_FETCH_SIZE,
+          pageToken: pageToken,
+        });
+        allRecords = allRecords.concat(res.records);
+        hasMore = res.hasMore;
+        pageToken = res.pageToken;
+        console.log(
+          `Fetched ${res.records.length} records (ByPage). Total fetched: ${allRecords.length}. Has more: ${hasMore}`
+        );
+      } catch (error) {
+        console.error("Error fetching records batch (ByPage):", error);
+        throw new Error(
+          t(
+            "error_fetching_records_batch",
+            `获取记录批次时出错: ${(error as Error).message || String(error)}`
+          )
+        );
+      }
+    }
+    console.log(`Finished fetching all ${allRecords.length} records (ByPage).`);
+    return allRecords;
+  };
+
   const handleSubmit = useCallback(
     async (values: FormValues) => {
       console.log("Form submitted:", values);
@@ -278,42 +319,39 @@ export default function App() {
         const outputFieldDuration = values.outputField_duration
           ? await table.getField<INumberField>(values.outputField_duration)
           : null;
-        const recordIdList = await table.getRecordIdList();
 
-        for (let i = 0; i < recordIdList.length; i += BATCH_SIZE) {
+        // --- Fetch ALL records first using the helper ---
+        const allRecords = await getAllRecords(table);
+        const totalRecordCount = allRecords.length;
+        // --- End fetch ---
+
+        // --- Process records in batches ---
+        for (let i = 0; i < totalRecordCount; i += BATCH_SIZE) {
           if (isStoppingRef.current) {
             console.log("Processing stopped by user.");
             Toast.warning(t("process_stopped", "处理已中止"));
             break;
           }
 
-          const batchRecordIds = recordIdList.slice(i, i + BATCH_SIZE);
-          // 移除错误的 getRecordsByIds 调用
-          // const recordValues: IRecordValue[] = await table.getRecordsByIds(batchRecordIds);
-
+          const batchRecords = allRecords.slice(i, i + BATCH_SIZE);
           const updates: { recordId: string; fields: Record<string, any> }[] =
             [];
 
-          // 遍历当前批次的 record ID
-          for (const recordId of batchRecordIds) {
+          // Iterate over the records fetched for the current batch
+          for (const record of batchRecords) {
             if (isStoppingRef.current) {
-              console.log(
-                "Processing stopped by user inside batch loop over IDs."
-              );
-              break; // 跳出内层循环 (遍历 ID)
+              console.log("Processing stopped by user inside batch loop.");
+              break; // Exit inner loop
             }
 
+            const recordId = record.recordId; // Get recordId from the record object
+
             try {
-              // 为每个 ID 获取记录值
-              const recordValue: IRecordValue = await table.getRecordById(
-                recordId
-              );
+              // Access fields directly from the fetched record object
+              const startCell = record.fields[latitudeField.id];
+              const endCell = record.fields[longitudeField.id];
 
-              // 从 recordValue.fields 中获取单元格值
-              const startCell = recordValue.fields[latitudeField.id];
-              const endCell = recordValue.fields[longitudeField.id];
-
-              // 检查单元格值是否是有效的地理位置对象
+              // Validation logic remains the same
               const isValidLocation = (
                 cell: any
               ): cell is {
@@ -336,10 +374,10 @@ export default function App() {
                   `Skipping record ${recordId}: Missing or invalid location data.`
                 );
                 skipCount++;
-                continue; // 继续处理下一个 recordId
+                continue;
               }
 
-              // 构造起点和终点参数 (优先使用经纬度)
+              // Parameter construction remains the same
               const originString =
                 startCell.lon !== undefined && startCell.lat !== undefined
                   ? `${startCell.lon},${startCell.lat}`
@@ -348,20 +386,16 @@ export default function App() {
                 endCell.lon !== undefined && endCell.lat !== undefined
                   ? `${endCell.lon},${endCell.lat}`
                   : endCell.location;
-
-              // 获取城市信息 (公交需要)
               const originCity = startCell.cityname;
               const destinationCity = endCell.cityname;
 
-              // --- Log city names for transit mode ---
               if (values.distanceType === "transit") {
                 console.log(
                   `Record ${recordId}: Transit calculation - Origin City: '${originCity}', Destination City: '${destinationCity}'`
                 );
               }
-              // --- End log ---
 
-              // 调用 calculateDistance
+              // Distance calculation remains the same
               const result: CalculateDistanceResult = await calculateDistance(
                 originString,
                 destinationString,
@@ -376,6 +410,7 @@ export default function App() {
                   : undefined
               );
 
+              // Update collection remains the same
               const recordUpdateFields: Record<string, any> = {};
               let updated = false;
 
@@ -397,7 +432,6 @@ export default function App() {
               }
 
               if (updated) {
-                // 将需要更新的记录和字段收集起来
                 updates.push({
                   recordId: recordId,
                   fields: recordUpdateFields,
@@ -426,20 +460,22 @@ export default function App() {
                 ),
                 duration: 5,
               });
-              // 单条记录错误不中断整个过程
+              // Continue with the next record
             }
-          } // 内层循环结束 (遍历 batchRecordIds)
 
-          // 在处理完一个批次的所有记录后，再次检查停止状态
+            // --- Add Delay After Each API Call in Inner Loop ---
+          } // End inner loop (processing batch records)
+
+          // Check stop status before batch update
           if (isStoppingRef.current) {
             console.log("Stop requested before batch update.");
             Toast.warning(
               t("process_stopped_before_update", "处理已中止，部分数据未写入")
             );
-            break; // 跳出外层循环 (遍历 BATCH_SIZE)
+            break; // Exit outer loop
           }
 
-          // 批量更新当前批次收集到的所有更改
+          // Batch update remains the same
           if (updates.length > 0) {
             await table.setRecords(updates);
             console.log(
@@ -447,20 +483,26 @@ export default function App() {
             );
           }
 
-          if (i + BATCH_SIZE < recordIdList.length) {
+          // Delay between batches remains the same
+          if (i + BATCH_SIZE < totalRecordCount) {
             await new Promise((resolve) =>
               setTimeout(resolve, DELAY_BETWEEN_BATCHES)
             );
           }
-        }
+        } // End outer loop (iterating through all records in batches)
       } catch (error: any) {
-        console.error("Error during batch processing:", error);
-        Toast.error(
-          t(
-            "batch_processing_error",
-            `批量处理时出错: ${error.message || error}`
-          )
-        );
+        console.error("Error during processing:", error);
+        // Handle errors from getAllRecords or other initial setup
+        if (error.message === "Process stopped during record fetch") {
+          Toast.warning(t("process_stopped_during_fetch", "记录获取过程中止"));
+        } else {
+          Toast.error(
+            t(
+              "processing_error", // More generic error message
+              `处理时出错: ${error.message || error}`
+            )
+          );
+        }
       } finally {
         setLoading(false);
         setIsStopping(false);
