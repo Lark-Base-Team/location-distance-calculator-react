@@ -9,6 +9,9 @@ import {
   Selection,
   ILocationField,
   INumberField,
+  IRecord,
+  IGetRecordsResponse,
+  IRecordValue,
 } from "@lark-base-open/js-sdk";
 import {
   Button,
@@ -52,6 +55,8 @@ export default function App() {
   const { t } = useTranslation();
   const formApi = useRef<BaseFormApi<FormValues>>();
   const [loading, setLoading] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
+  const isStoppingRef = useRef(isStopping);
   const [tableMetaList, setTableMetaList] = useState<ITableMeta[]>([]);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [locationFields, setLocationFields] = useState<ILocationFieldMeta[]>(
@@ -184,6 +189,11 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [distanceType]); // 依赖 distanceType
 
+  // 更新 ref 当 isStopping 变化时
+  useEffect(() => {
+    isStoppingRef.current = isStopping;
+  }, [isStopping]);
+
   // handleTableChange 只更新 state
   const handleTableChange = useCallback((tableId: string | null) => {
     console.log("handleTableChange called with:", tableId);
@@ -196,9 +206,18 @@ export default function App() {
     setDistanceType(value as string | undefined);
   }, []);
 
+  // 请求停止处理
+  const requestStop = useCallback(() => {
+    console.log("Stop requested");
+    setIsStopping(true);
+    Toast.info(t("stopping_process", "正在尝试停止..."));
+  }, [t]);
+
   const handleSubmit = useCallback(
     async (values: FormValues) => {
       console.log("Form submitted:", values);
+      setIsStopping(false);
+      isStoppingRef.current = false;
 
       // --- 输入验证 ---
       if (
@@ -236,6 +255,10 @@ export default function App() {
       let successCount = 0;
       let errorCount = 0;
       let skipCount = 0;
+      const startTime = performance.now();
+      const apiKey = values.customApiKey || DEFAULT_API_KEY;
+      const BATCH_SIZE = 10;
+      const DELAY_BETWEEN_BATCHES = 100;
 
       try {
         const table = await bitable.base.getTableById(values.table);
@@ -253,117 +276,188 @@ export default function App() {
           : null;
         const recordIdList = await table.getRecordIdList();
 
-        const apiKey = values.customApiKey || DEFAULT_API_KEY;
-        const currentDistanceType = values.distanceType; // 从 values 获取
-        const currentDrivingStrategy =
-          currentDistanceType === "driving"
-            ? values.drivingStrategy
-            : undefined; // 只在驾车时使用策略
+        for (let i = 0; i < recordIdList.length; i += BATCH_SIZE) {
+          if (isStoppingRef.current) {
+            console.log("Processing stopped by user.");
+            Toast.warning(t("process_stopped", "处理已中止"));
+            break;
+          }
 
-        for (const recordId of recordIdList) {
-          try {
-            // 直接获取值，后续进行类型检查
-            const latVal = await latitudeField.getValue(recordId);
-            const lonVal = await longitudeField.getValue(recordId);
+          const batchRecordIds = recordIdList.slice(i, i + BATCH_SIZE);
+          // 移除错误的 getRecordsByIds 调用
+          // const recordValues: IRecordValue[] = await table.getRecordsByIds(batchRecordIds);
 
-            // 检查地理位置值是否有效
-            const isLatValid =
-              latVal &&
-              typeof latVal === "object" &&
-              "location" in latVal &&
-              typeof latVal.location === "string" &&
-              latVal.location;
-            const isLonValid =
-              lonVal &&
-              typeof lonVal === "object" &&
-              "location" in lonVal &&
-              typeof lonVal.location === "string" &&
-              lonVal.location;
+          const updates: { recordId: string; fields: Record<string, any> }[] =
+            [];
 
-            if (!isLatValid || !isLonValid) {
-              console.warn(
-                `Record ${recordId}: Skipping due to missing or invalid location data.`
+          // 遍历当前批次的 record ID
+          for (const recordId of batchRecordIds) {
+            if (isStoppingRef.current) {
+              console.log(
+                "Processing stopped by user inside batch loop over IDs."
               );
-              skipCount++;
-              continue; // 跳过这条记录
+              break; // 跳出内层循环 (遍历 ID)
             }
 
-            // 提取需要的信息 (类型已在上一步检查中确认)
-            const origin = latVal.location as string;
-            const destination = lonVal.location as string;
-            // 使用可选链和类型断言获取城市名
-            const originCity = (latVal as any)?.cityname as string | undefined;
-            const destinationCity = (lonVal as any)?.cityname as
-              | string
-              | undefined;
+            try {
+              // 为每个 ID 获取记录值
+              const recordValue: IRecordValue = await table.getRecordById(
+                recordId
+              );
 
-            // 调用 API 计算
-            const result: CalculateDistanceResult = await calculateDistance(
-              origin,
-              destination,
-              originCity,
-              destinationCity,
-              currentDistanceType, // 使用从 values 获取的类型
-              apiKey,
-              currentDrivingStrategy // 使用处理后的策略
+              // 从 recordValue.fields 中获取单元格值
+              const startCell = recordValue.fields[latitudeField.id];
+              const endCell = recordValue.fields[longitudeField.id];
+
+              // 检查单元格值是否是有效的地理位置对象
+              const isValidLocation = (
+                cell: any
+              ): cell is {
+                location: string;
+                cityname?: string;
+                lat?: number;
+                lon?: number;
+              } =>
+                cell &&
+                typeof cell === "object" &&
+                typeof cell.location === "string";
+
+              if (
+                !isValidLocation(startCell) ||
+                !isValidLocation(endCell) ||
+                !startCell.location ||
+                !endCell.location
+              ) {
+                console.log(
+                  `Skipping record ${recordId}: Missing or invalid location data.`
+                );
+                skipCount++;
+                continue; // 继续处理下一个 recordId
+              }
+
+              // 构造起点和终点参数 (优先使用经纬度)
+              const originString =
+                startCell.lon !== undefined && startCell.lat !== undefined
+                  ? `${startCell.lon},${startCell.lat}`
+                  : startCell.location;
+              const destinationString =
+                endCell.lon !== undefined && endCell.lat !== undefined
+                  ? `${endCell.lon},${endCell.lat}`
+                  : endCell.location;
+
+              // 获取城市信息 (公交需要)
+              const originCity = startCell.cityname;
+              const destinationCity = endCell.cityname;
+
+              // 调用 calculateDistance
+              const result: CalculateDistanceResult = await calculateDistance(
+                originString,
+                destinationString,
+                originCity,
+                destinationCity,
+                values.distanceType!,
+                apiKey,
+                values.drivingStrategy
+              );
+
+              const recordUpdateFields: Record<string, any> = {};
+              let updated = false;
+
+              if (
+                outputFieldDistance &&
+                result.distance !== null &&
+                result.distance !== undefined
+              ) {
+                recordUpdateFields[outputFieldDistance.id] = result.distance;
+                updated = true;
+              }
+              if (
+                outputFieldDuration &&
+                result.duration !== null &&
+                result.duration !== undefined
+              ) {
+                recordUpdateFields[outputFieldDuration.id] = result.duration;
+                updated = true;
+              }
+
+              if (updated) {
+                // 将需要更新的记录和字段收集起来
+                updates.push({
+                  recordId: recordId,
+                  fields: recordUpdateFields,
+                });
+                successCount++;
+              } else {
+                console.log(`Record ${recordId}: No valid results to update.`);
+                // 如果没有计算出任何有效结果，也算作跳过？或者单独计数？暂计入 skip
+                skipCount++;
+              }
+            } catch (err: any) {
+              console.error(`Error processing record ${recordId}:`, err);
+              errorCount++;
+              Notification.error({
+                title: t("record_error_title", "记录处理错误"),
+                content: t(
+                  "record_error_content",
+                  `记录 ID: ${recordId} 计算失败: ${err.message || err}`
+                ),
+                duration: 5,
+              });
+              // 单条记录错误不中断整个过程
+            }
+          } // 内层循环结束 (遍历 batchRecordIds)
+
+          // 在处理完一个批次的所有记录后，再次检查停止状态
+          if (isStoppingRef.current) {
+            console.log("Stop requested before batch update.");
+            Toast.warning(
+              t("process_stopped_before_update", "处理已中止，部分数据未写入")
             );
+            break; // 跳出外层循环 (遍历 BATCH_SIZE)
+          }
 
-            console.log(`Record ${recordId}: Result =`, result);
+          // 批量更新当前批次收集到的所有更改
+          if (updates.length > 0) {
+            await table.setRecords(updates);
+            console.log(
+              `Batch ${i / BATCH_SIZE + 1} updated ${updates.length} records.`
+            );
+          }
 
-            // 更新输出字段
-            const updates: Promise<any>[] = [];
-            if (outputFieldDistance && result.distance !== null) {
-              // 注意：setValue 对于数字字段需要传入 number 类型
-              updates.push(
-                outputFieldDistance.setValue(recordId, result.distance)
-              );
-            }
-            if (outputFieldDuration && result.duration !== null) {
-              updates.push(
-                outputFieldDuration.setValue(recordId, result.duration)
-              );
-            }
-
-            await Promise.all(updates);
-            successCount++;
-          } catch (recordError) {
-            console.error(`Error processing record ${recordId}:`, recordError);
-            errorCount++;
-            // 可以选择在这里为单条记录显示 Toast，但可能会过多
-            // Toast.error(`记录 ${recordId} 处理失败: ${recordError instanceof Error ? recordError.message : String(recordError)}`);
+          if (i + BATCH_SIZE < recordIdList.length) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, DELAY_BETWEEN_BATCHES)
+            );
           }
         }
-
-        // 处理完成后的提示
-        if (errorCount > 0) {
-          Notification.warning({
-            title: t("processing_completed_with_errors", "处理完成，但有错误"),
-            content: t(
-              "processing_summary",
-              `成功: ${successCount}, 失败: ${errorCount}, 跳过: ${skipCount}`
-            ),
-            duration: 5, // 持续时间（秒）
-          });
-        } else {
-          Toast.success(
-            t(
-              "completed",
-              `处理完成 (成功: ${successCount}, 跳过: ${skipCount})`
-            )
-          );
-        }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error during batch processing:", error);
         Toast.error(
-          `${t("processing_error", "处理过程中发生错误")}: ${
-            error instanceof Error ? error.message : String(error)
-          }`
+          t(
+            "batch_processing_error",
+            `批量处理时出错: ${error.message || error}`
+          )
         );
       } finally {
         setLoading(false);
+        setIsStopping(false);
+        isStoppingRef.current = false;
+        const endTime = performance.now();
+        const durationSeconds = ((endTime - startTime) / 1000).toFixed(2);
+        console.log(`Processing finished in ${durationSeconds} seconds.`);
+        if (isStoppingRef.current) {
+          Toast.info(t("process_manually_stopped", "处理已被用户停止"));
+        } else {
+          Toast.success(
+            t(
+              "process_complete",
+              `处理完成！成功: ${successCount}, 失败: ${errorCount}, 跳过: ${skipCount}. 耗时: ${durationSeconds} 秒`
+            )
+          );
+        }
       }
     },
-    [t] // 移除 distanceType 依赖
+    [t, locationFields, numberFields]
   );
 
   return (
@@ -373,16 +467,12 @@ export default function App() {
           labelPosition="top"
           onSubmit={handleSubmit}
           getFormApi={(api) => (formApi.current = api)}
-          // 设置 distanceType 的初始值，Effect 4 会将其同步到 Form
-          // 设置 drivingStrategy 的初始值，Form 会直接使用
           initValues={{ distanceType: "driving", drivingStrategy: "32" }}
-          // 监听 Form 值的变化，更新 distanceType state (可选，但推荐用于保持同步)
           onValueChange={(values) => {
             if (
               values.distanceType !== undefined &&
               values.distanceType !== distanceType
             ) {
-              // 只有在 Form 的值和 state 不同时才更新 state，避免不必要的重渲染
               setDistanceType(values.distanceType);
             }
           }}
@@ -403,9 +493,7 @@ export default function App() {
               label: name,
               value: id,
             }))}
-            // value={selectedTableId} // Form.Select 会自动处理来自 Form state 的值
             onChange={(value) => handleTableChange(value as string | null)}
-            // onChange 中不再需要 setValues
           ></Form.Select>
           <Form.Select
             field="latitudeField"
@@ -420,7 +508,6 @@ export default function App() {
             ]}
             optionList={fieldMetaToOptions(locationFields)}
             disabled={!selectedTableId}
-            // value={undefined} // 不需要手动控制 value，Form 会处理
           ></Form.Select>
           <Form.Select
             field="longitudeField"
@@ -451,11 +538,9 @@ export default function App() {
               { label: t("bicycling", "骑行"), value: "bicycling" },
               { label: t("transit", "公交"), value: "transit" },
             ]}
-            // value={distanceType} // Form.Select 会自动处理来自 Form state 的值
-            onChange={handleDistanceTypeChange} // onChange 只调用 setDistanceType
+            onChange={handleDistanceTypeChange}
           ></Form.Select>
 
-          {/* 恢复使用 distanceType state 进行条件渲染 */}
           {distanceType === "driving" && (
             <Form.Select
               field="drivingStrategy"
@@ -465,7 +550,6 @@ export default function App() {
                 "选择驾车路线偏好"
               )}
               style={{ width: "100%" }}
-              // initValue="32" // 初始值已在 Form 的 initValues 中设置
               optionList={[
                 {
                   label: t("driving_strategy_fastest", "速度优先"),
@@ -523,15 +607,33 @@ export default function App() {
             label={t("custom_api_key_label", "自定义高德 API Key (Web服务)")}
             placeholder={t(
               "custom_api_key_placeholder",
-              "可选，若不填则使用内置 Key"
+              "输入您的高德 Web 服务 API Key (可选)"
             )}
             style={{ width: "100%" }}
           />
-          <Button theme="solid" htmlType="submit" block>
-            {t("button", "开始计算")}
-          </Button>
         </Form>
       </Spin>
+
+      <div style={{ marginTop: "16px", display: "flex", gap: "8px" }}>
+        <Button
+          theme="solid"
+          onClick={() => formApi.current?.submitForm()}
+          disabled={loading}
+          style={{ flexGrow: 1 }}
+        >
+          {t("submit", "开始计算")}
+        </Button>
+        {loading && (
+          <Button
+            theme="light"
+            type="danger"
+            onClick={requestStop}
+            style={{ flexShrink: 0 }}
+          >
+            {t("stop", "停止")}
+          </Button>
+        )}
+      </div>
     </main>
   );
 }
