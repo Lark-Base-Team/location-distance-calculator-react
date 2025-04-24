@@ -103,21 +103,15 @@ export default function App() {
   useEffect(() => {
     const fetchFields = async () => {
       if (!selectedTableId) {
-        console.info("Effect 2: No selectedTableId, clearing fields.");
         setLocationFields([]);
         setNumberFields([]);
         // Ensure FormApi clears form values when available
-        // This logic moved to the selectedTableId effect below to avoid repetition
         return;
       }
-      console.info("Effect 2: Starting field fetch, setting loading to true.");
       setLoading(true);
       try {
-        console.info(`Effect 2: Getting table by ID: ${selectedTableId}`);
         const table = await bitable.base.getTableById(selectedTableId);
-        console.info(`Effect 2: Got table, getting field meta list...`);
         const fieldMetaList = await table.getFieldMetaList();
-        console.info(`Effect 2: Got field meta list, processing...`);
 
         const locFields = fieldMetaList.filter(
           (field): field is ILocationFieldMeta =>
@@ -129,16 +123,12 @@ export default function App() {
 
         setLocationFields(locFields);
         setNumberFields(numFields);
-        console.info("Effect 2: Fields processed and set.");
       } catch (error) {
         console.error("Effect 2: Error fetching fields:", error);
         Toast.error(t("error_fetching_fields"));
         setLocationFields([]);
         setNumberFields([]);
       } finally {
-        console.info(
-          "Effect 2: Entering finally block, setting loading to false."
-        ); // Confirm finally execution
         setLoading(false);
       }
     };
@@ -150,8 +140,6 @@ export default function App() {
   // Effect 3: 响应 selectedTableId 变化，更新表单并清空字段
   useEffect(() => {
     if (!formApi.current) return; // 确保 formApi 已初始化
-
-    console.info("Effect 3: selectedTableId changed to:", selectedTableId);
 
     if (selectedTableId) {
       // 设置 table 字段并清空相关字段
@@ -185,10 +173,6 @@ export default function App() {
       const currentFormDistanceType = formApi.current.getValue("distanceType");
       if (currentFormDistanceType && currentFormDistanceType !== distanceType) {
         setDistanceType(currentFormDistanceType);
-        console.info(
-          "Synced distanceType state with form value:",
-          currentFormDistanceType
-        );
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -201,7 +185,6 @@ export default function App() {
 
   // handleTableChange 只更新 state
   const handleTableChange = useCallback((tableId: string | null) => {
-    console.info("handleTableChange called with:", tableId);
     setSelectedTableId(tableId);
   }, []);
 
@@ -210,7 +193,6 @@ export default function App() {
 
   // 请求停止处理
   const requestStop = useCallback(() => {
-    console.info("Stop requested");
     setIsStopping(true);
     Toast.info(t("stopping_process"));
   }, [t]);
@@ -221,10 +203,6 @@ export default function App() {
     let pageToken: string | undefined = undefined;
     let hasMore = true;
     const BATCH_FETCH_SIZE = 200;
-
-    console.info(
-      `Starting to fetch all records using ByPage (batch size: ${BATCH_FETCH_SIZE})...`
-    );
 
     while (hasMore) {
       if (isStoppingRef.current) {
@@ -239,9 +217,6 @@ export default function App() {
         allRecords = allRecords.concat(res.records);
         hasMore = res.hasMore;
         pageToken = res.pageToken;
-        console.info(
-          `Fetched ${res.records.length} records (ByPage). Total fetched: ${allRecords.length}. Has more: ${hasMore}`
-        );
       } catch (error) {
         console.error("Error fetching records batch (ByPage):", error);
         throw new Error(
@@ -251,15 +226,11 @@ export default function App() {
         );
       }
     }
-    console.info(
-      `Finished fetching all ${allRecords.length} records (ByPage).`
-    );
     return allRecords;
   };
 
   const handleSubmit = useCallback(
     async (values: FormValues) => {
-      console.debug("Form submitted:", values);
       setIsStopping(false);
       isStoppingRef.current = false;
 
@@ -461,9 +432,6 @@ export default function App() {
           // Batch update remains the same
           if (updates.length > 0) {
             await table.setRecords(updates);
-            console.info(
-              `Batch ${i / BATCH_SIZE + 1} updated ${updates.length} records.`
-            );
           }
 
           // Delay between batches remains the same
@@ -540,7 +508,6 @@ export default function App() {
           onValueChange={(values, changedValues) => {
             if (changedValues.hasOwnProperty("distanceType")) {
               const newDistanceType = values.distanceType;
-              console.info("Form distanceType changed to:", newDistanceType);
               if (newDistanceType) {
                 setDistanceType(newDistanceType);
               }

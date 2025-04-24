@@ -34,27 +34,18 @@ async function getCitycodeFromCityName(
     getCitycodeFromCityName.cache &&
     getCitycodeFromCityName.cache[cityName]
   ) {
-    console.debug(`[getCitycode] Using cached citycode for ${cityName}`);
     return getCitycodeFromCityName.cache[cityName];
   }
 
   const url = `https://restapi.amap.com/v3/geocode/geo?address=${encodeURIComponent(
     cityName
   )}&key=${apiKey}`;
-  console.debug(
-    `[getCitycode] Requesting V3 Geocoding for "${cityName}" with URL:`,
-    url.replace(apiKey, "key=***")
-  );
   try {
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const data = (await response.json()) as GaodeGeocodingV3Response;
-    console.debug(
-      `[getCitycode] V3 Geocoding Response for "${cityName}":`,
-      data
-    );
 
     if (data.status === "1" && data.geocodes && data.geocodes.length > 0) {
       // --- Extract citycode instead of adcode ---
@@ -64,9 +55,6 @@ async function getCitycodeFromCityName(
           getCitycodeFromCityName.cache = {};
         }
         getCitycodeFromCityName.cache[cityName] = citycode; // Cache the result
-        console.debug(
-          `[getCitycode] Found citycode for "${cityName}": ${citycode}`
-        );
         return citycode;
       } else {
         // Handle cases where citycode might be empty or not a string (though unlikely for city level query)
@@ -125,14 +113,14 @@ export async function calculateDistance(
   strategy?: string // 设为可选
 ): Promise<CalculateDistanceResult> {
   // --- Log input parameters ---
-  console.debug(`calculateDistance called with:
-  origin: "${origin}"
-  destination: "${destination}"
-  originCity: "${originCity}"
-  destinationCity: "${destinationCity}"
-  mode: "${mode}"
-  strategy: "${strategy}"
-  apiKey: "${apiKey ? apiKey.substring(0, 5) + "..." : "N/A"}"`);
+  // console.debug(`calculateDistance called with:
+  // origin: "${origin}"
+  // destination: "${destination}"
+  // originCity: "${originCity}"
+  // destinationCity: "${destinationCity}"
+  // mode: "${mode}"
+  // strategy: "${strategy}"
+  // apiKey: "${apiKey ? apiKey.substring(0, 5) + "..." : "N/A"}"`);
   // --- End log ---
 
   let url: string;
@@ -186,7 +174,7 @@ export async function calculateDistance(
       // console.log("[Transit URL Step 2] Added destination:", params_transit.join("&"));
 
       // --- Get citycodes for cities --- // UPDATED STEP
-      console.debug("[Transit Citycode] Attempting to fetch citycodes...");
+      // console.debug("[Transit Citycode] Attempting to fetch citycodes...");
       let originCitycode: string | null = null;
       let destinationCitycode: string | null = null;
 
@@ -210,9 +198,7 @@ export async function calculateDistance(
         );
       }
 
-      console.debug(
-        `[Transit Citycode] Fetched citycodes: origin=${originCitycode}, destination=${destinationCitycode}`
-      );
+      // console.debug(`[Transit Citycode] Fetched citycodes: origin=${originCitycode}, destination=${destinationCitycode}`);
 
       if (!originCitycode || !destinationCitycode) {
         throw new Error(
@@ -234,15 +220,9 @@ export async function calculateDistance(
         params_transit.push(`strategy=${strategy}`);
       }
       const joinedParams = params_transit.join("&"); // Join explicitly
-      console.debug(
-        "[Transit URL Joined] Joined params string (raw, using citycodes):", // Updated log
-        joinedParams.replace(apiKey, "key=***") // Mask key in log
-      ); // Log joined string raw
+      // console.debug("[Transit URL Joined] Joined params string (raw, using citycodes):", joinedParams.replace(apiKey, "key=***")); // Removed
       url = `${baseUrl_transit}?${joinedParams}`; // Assign joined string
-      console.debug(
-        "[Transit URL Final Raw] Final URL before fetch (using citycodes):",
-        url.replace(apiKey, "key=***")
-      ); // Log raw final URL before fetch // Updated log
+      // console.debug("[Transit URL Final Raw] Final URL before fetch (using citycodes):", url.replace(apiKey, "key=***")); // Removed
       // ---- End Manual URL Construction ----
 
       // url = `https://restapi.amap.com/v5/direction/transit/integrated?origin=${origin}&destination=${destination}&city=${encodeURIComponent(
@@ -262,17 +242,15 @@ export async function calculateDistance(
 
   // --- Log added for city name verification ---
   if (mode === "transit") {
-    console.debug(
-      `[Transit City Check] Raw cities before encoding: originCity="${originCity}", destinationCity="${destinationCity}"`
-    );
+    // console.debug(`[Transit City Check] Raw cities before encoding: originCity="${originCity}", destinationCity="${destinationCity}"`);
   }
   // --- End log ---
 
-  console.debug("Requesting API (raw URL):", url); // 打印 URL，不再隐藏 Key
+  // console.debug("Requesting API (raw URL):", url); // Removed
 
   try {
     // Log the URL again immediately before fetch
-    console.debug("URL passed to fetch:", url);
+    // console.debug("URL passed to fetch:", url); // Removed
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -286,7 +264,7 @@ export async function calculateDistance(
     // --- v3 Distance API (direct only) ---
     if (mode === "direct") {
       data = (await response.json()) as GaodeDistanceV3Response;
-      console.debug("API Response:", data);
+      // console.debug("API Response:", data);
 
       // Removed walking from this block
       if (
@@ -312,7 +290,7 @@ export async function calculateDistance(
     // --- v5 Driving API ---
     else if (mode === "driving") {
       data = (await response.json()) as GaodeDrivingV5Response;
-      console.debug("API Response:", data);
+      // console.debug("API Response:", data);
 
       // v5版本status=1代表成功，但infocode=10000才代表成功
       if (data.status !== "1" || data.infocode !== "10000") {
@@ -350,7 +328,7 @@ export async function calculateDistance(
     // --- v5 Walking API (New block) ---
     else if (mode === "walking") {
       data = (await response.json()) as GaodeWalkingV5Response;
-      console.debug("API Response:", data);
+      // console.debug("API Response:", data);
 
       if (data.status !== "1" || data.infocode !== "10000") {
         throw new Error(
@@ -384,7 +362,7 @@ export async function calculateDistance(
     // --- v5 Bicycling API (New block) ---
     else if (mode === "bicycling") {
       data = (await response.json()) as GaodeBicyclingV5Response;
-      console.debug("API Response:", data);
+      // console.debug("API Response:", data);
 
       // -- Start modification --
       // Check for specific non-critical error codes first
@@ -429,7 +407,7 @@ export async function calculateDistance(
     // --- v5 Transit API --- (Updated to V5 parsing logic)
     else if (mode === "transit") {
       data = (await response.json()) as GaodeTransitV5Response;
-      console.debug("API Response:", data);
+      // console.debug("API Response:", data);
 
       if (data.status !== "1" || data.infocode !== "10000") {
         // Use V5 success check
