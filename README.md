@@ -4,7 +4,7 @@
 
 这是一个为[飞书多维表格](https://feishu.cn/product/base)设计的插件（使用 React 重构），用于计算两个指定地理位置字段之间的距离和预估时间。
 
-原版插件链接（基于 UIBuilder）：https://lq0ffyd8fx.feishu.cn/base/extension/replit_3efac8be7421a3e5
+插件链接（基于 UIBuilder）：https://lq0ffyd8fx.feishu.cn/base/extension/replit_3efac8be7421a3e5
 
 ## ✨ 功能特性
 
@@ -26,33 +26,7 @@
 ## 📋 示例与指南
 
 - **示例多维表格:** [点击查看](https://lq0ffyd8fx.feishu.cn/base/HXBtbSS8zaERQ2svkfHcf2RsnTb?table=tblCe0djHFc8Kwen&view=vewHR920NB)
-- **使用指南:** [「地理位置距离计算」插件使用指南](https://fexakcngwi.feishu.cn/docx/TDb1dc7uIoD4IXx0QYHcn7yQnxb) (与原版基本一致)
-
-## 🚀 开始使用
-
-1.  **安装依赖:**
-    ```bash
-    npm install
-    # 或者
-    yarn install
-    ```
-2.  **运行开发环境:**
-
-    ```bash
-    npm run dev
-    # 或者
-    yarn dev
-    ```
-
-    在飞书多维表格中加载插件进行调试。
-
-3.  **构建生产版本:**
-    ```bash
-    npm run build
-    # 或者
-    yarn build
-    ```
-    构建产物将位于 `dist` 目录下。
+- **使用指南:** [「地理位置距离计算」插件使用指南](https://fexakcngwi.feishu.cn/docx/TDb1dc7uIoD4IXx0QYHcn7yQnxb)
 
 ## 🛠️ 开发
 
@@ -81,10 +55,5 @@
 6.  优化错误处理和用户提示。
 7.  完善或移除 `src/CityCodes.ts`。
 8.  考虑 API Key 的更安全管理方式（例如：通过配置或其他方式）。
-
-## 发布
-
-请先 `npm run build`，连同 `dist` 目录一起提交，然后填写表单：
-[共享表单](https://feishu.feishu.cn/share/base/form/shrcnGFgOOsFGew3SDZHPhzkM0e)
 
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FVinfall%2Flocation-distance-calculator-react.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FVinfall%2Flocation-distance-calculator-react?ref=badge_large)
