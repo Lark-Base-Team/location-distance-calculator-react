@@ -40,7 +40,7 @@ export async function calculateDistance(
       url = `https://restapi.amap.com/v3/distance?type=0&origins=${origin}&destination=${destination}&${keyParam}`;
       break;
     case "driving": // 驾车路径规划 v5
-      url = `https://restapi.amap.com/v5/direction/driving?origin=${origin}&destination=${destination}&${keyParam}`;
+      url = `https://restapi.amap.com/v5/direction/driving?origin=${origin}&destination=${destination}&${keyParam}&show_fields=cost`;
       if (strategy) {
         url += `&strategy=${strategy}`;
       }
@@ -109,8 +109,8 @@ export async function calculateDistance(
         distance = data.route.paths[0].distance
           ? Number(data.route.paths[0].distance) / 1000
           : null;
-        duration = data.route.paths[0].duration
-          ? Number(data.route.paths[0].duration) / 60
+        duration = data.route.paths[0].cost?.duration
+          ? Number(data.route.paths[0].cost.duration) / 60
           : null;
       } else {
         // 即使 infocode 是 10000，也可能没有路径（例如无法到达）
