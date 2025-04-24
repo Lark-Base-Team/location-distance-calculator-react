@@ -103,21 +103,21 @@ export default function App() {
   useEffect(() => {
     const fetchFields = async () => {
       if (!selectedTableId) {
-        console.log("Effect 2: No selectedTableId, clearing fields.");
+        console.info("Effect 2: No selectedTableId, clearing fields.");
         setLocationFields([]);
         setNumberFields([]);
         // Ensure FormApi clears form values when available
         // This logic moved to the selectedTableId effect below to avoid repetition
         return;
       }
-      console.log("Effect 2: Starting field fetch, setting loading to true.");
+      console.info("Effect 2: Starting field fetch, setting loading to true.");
       setLoading(true);
       try {
-        console.log(`Effect 2: Getting table by ID: ${selectedTableId}`);
+        console.info(`Effect 2: Getting table by ID: ${selectedTableId}`);
         const table = await bitable.base.getTableById(selectedTableId);
-        console.log(`Effect 2: Got table, getting field meta list...`);
+        console.info(`Effect 2: Got table, getting field meta list...`);
         const fieldMetaList = await table.getFieldMetaList();
-        console.log(`Effect 2: Got field meta list, processing...`);
+        console.info(`Effect 2: Got field meta list, processing...`);
 
         const locFields = fieldMetaList.filter(
           (field): field is ILocationFieldMeta =>
@@ -129,14 +129,14 @@ export default function App() {
 
         setLocationFields(locFields);
         setNumberFields(numFields);
-        console.log("Effect 2: Fields processed and set.");
+        console.info("Effect 2: Fields processed and set.");
       } catch (error) {
         console.error("Effect 2: Error fetching fields:", error);
         Toast.error(t("error_fetching_fields"));
         setLocationFields([]);
         setNumberFields([]);
       } finally {
-        console.log(
+        console.info(
           "Effect 2: Entering finally block, setting loading to false."
         ); // Confirm finally execution
         setLoading(false);
@@ -151,7 +151,7 @@ export default function App() {
   useEffect(() => {
     if (!formApi.current) return; // 确保 formApi 已初始化
 
-    console.log("Effect 3: selectedTableId changed to:", selectedTableId);
+    console.info("Effect 3: selectedTableId changed to:", selectedTableId);
 
     if (selectedTableId) {
       // 设置 table 字段并清空相关字段
@@ -185,7 +185,7 @@ export default function App() {
       const currentFormDistanceType = formApi.current.getValue("distanceType");
       if (currentFormDistanceType && currentFormDistanceType !== distanceType) {
         setDistanceType(currentFormDistanceType);
-        console.log(
+        console.info(
           "Synced distanceType state with form value:",
           currentFormDistanceType
         );
@@ -201,7 +201,7 @@ export default function App() {
 
   // handleTableChange 只更新 state
   const handleTableChange = useCallback((tableId: string | null) => {
-    console.log("handleTableChange called with:", tableId);
+    console.info("handleTableChange called with:", tableId);
     setSelectedTableId(tableId);
   }, []);
 
@@ -210,7 +210,7 @@ export default function App() {
 
   // 请求停止处理
   const requestStop = useCallback(() => {
-    console.log("Stop requested");
+    console.info("Stop requested");
     setIsStopping(true);
     Toast.info(t("stopping_process"));
   }, [t]);
@@ -222,13 +222,13 @@ export default function App() {
     let hasMore = true;
     const BATCH_FETCH_SIZE = 200;
 
-    console.log(
+    console.info(
       `Starting to fetch all records using ByPage (batch size: ${BATCH_FETCH_SIZE})...`
     );
 
     while (hasMore) {
       if (isStoppingRef.current) {
-        console.log("Record fetching stopped by user.");
+        console.warn("Record fetching stopped by user.");
         throw new Error(t("process_stopped_during_fetch"));
       }
       try {
@@ -239,7 +239,7 @@ export default function App() {
         allRecords = allRecords.concat(res.records);
         hasMore = res.hasMore;
         pageToken = res.pageToken;
-        console.log(
+        console.info(
           `Fetched ${res.records.length} records (ByPage). Total fetched: ${allRecords.length}. Has more: ${hasMore}`
         );
       } catch (error) {
@@ -251,13 +251,15 @@ export default function App() {
         );
       }
     }
-    console.log(`Finished fetching all ${allRecords.length} records (ByPage).`);
+    console.info(
+      `Finished fetching all ${allRecords.length} records (ByPage).`
+    );
     return allRecords;
   };
 
   const handleSubmit = useCallback(
     async (values: FormValues) => {
-      console.log("Form submitted:", values);
+      console.debug("Form submitted:", values);
       setIsStopping(false);
       isStoppingRef.current = false;
 
@@ -322,7 +324,7 @@ export default function App() {
         // --- Process records in batches ---
         for (let i = 0; i < totalRecordCount; i += BATCH_SIZE) {
           if (isStoppingRef.current) {
-            console.log("Processing stopped by user.");
+            console.warn("Processing stopped by user.");
             Toast.warning(t("process_stopped"));
             break;
           }
@@ -334,7 +336,7 @@ export default function App() {
           // Iterate over the records fetched for the current batch
           for (const record of batchRecords) {
             if (isStoppingRef.current) {
-              console.log("Processing stopped by user inside batch loop.");
+              console.warn("Processing stopped by user inside batch loop.");
               break; // Exit inner loop
             }
 
@@ -354,7 +356,7 @@ export default function App() {
                 !startCell.location ||
                 !endCell.location
               ) {
-                console.log(
+                console.warn(
                   `Skipping record ${recordId}: Missing or invalid location data.`
                 );
                 skipCount++;
@@ -368,7 +370,7 @@ export default function App() {
               const destinationCity = endCell.cityname;
 
               if (values.distanceType === "transit") {
-                console.log(
+                console.debug(
                   `Record ${recordId}: Transit calculation - Origin City: '${originCity}', Destination City: '${destinationCity}'`
                 );
               }
@@ -417,11 +419,11 @@ export default function App() {
                 successCount++;
               } else {
                 if (!outputFieldDistance && !outputFieldDuration) {
-                  console.log(
+                  console.warn(
                     `Skipping record ${recordId}: No output fields selected.`
                   );
                 } else {
-                  console.log(
+                  console.warn(
                     `Record ${recordId}: No valid results to update for selected output fields.`
                   );
                 }
@@ -451,7 +453,7 @@ export default function App() {
 
           // Check stop status before batch update
           if (isStoppingRef.current) {
-            console.log("Stop requested before batch update.");
+            console.warn("Stop requested before batch update.");
             Toast.warning(t("process_stopped_before_update"));
             break; // Exit outer loop
           }
@@ -459,7 +461,7 @@ export default function App() {
           // Batch update remains the same
           if (updates.length > 0) {
             await table.setRecords(updates);
-            console.log(
+            console.info(
               `Batch ${i / BATCH_SIZE + 1} updated ${updates.length} records.`
             );
           }
@@ -489,7 +491,7 @@ export default function App() {
         isStoppingRef.current = false;
         const endTime = performance.now();
         const durationSeconds = ((endTime - startTime) / 1000).toFixed(2);
-        console.log(`Processing finished in ${durationSeconds} seconds.`);
+        console.info(`Processing finished in ${durationSeconds} seconds.`);
         if (isStoppingRef.current) {
           Toast.info(t("process_manually_stopped"));
         } else {
@@ -538,7 +540,7 @@ export default function App() {
           onValueChange={(values, changedValues) => {
             if (changedValues.hasOwnProperty("distanceType")) {
               const newDistanceType = values.distanceType;
-              console.log("Form distanceType changed to:", newDistanceType);
+              console.info("Form distanceType changed to:", newDistanceType);
               if (newDistanceType) {
                 setDistanceType(newDistanceType);
               }
