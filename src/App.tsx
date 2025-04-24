@@ -72,7 +72,7 @@ export default function App() {
     []
   );
   const [numberFields, setNumberFields] = useState<INumberFieldMeta[]>([]);
-  const [distanceType, setDistanceType] = useState<string>("driving");
+  const [distanceType, setDistanceType] = useState<string>("direct");
 
   // Effect 1: 加载数据表列表和初始选中项
   useEffect(() => {
@@ -514,7 +514,7 @@ export default function App() {
           onSubmit={handleSubmit}
           getFormApi={(api) => (formApi.current = api)}
           initValues={{
-            distanceType: "driving",
+            distanceType: "direct",
             drivingStrategy: "32",
             transitStrategy: "0",
           }}
