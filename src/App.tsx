@@ -53,14 +53,6 @@ interface FormValues {
   customApiKey?: string;
 }
 
-// 辅助函数：将字段元数据转换为 Select 选项
-const fieldMetaToOptions = (fieldMetaList: IFieldMeta[]) => {
-  return fieldMetaList.map(({ name, id }) => ({
-    label: name,
-    value: id,
-  }));
-};
-
 export default function App() {
   const { t } = useTranslation();
   const formApi = useRef<BaseFormApi<FormValues>>();
@@ -69,10 +61,12 @@ export default function App() {
   const isStoppingRef = useRef(isStopping);
   const [tableMetaList, setTableMetaList] = useState<ITableMeta[]>([]);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
-  const [locationFields, setLocationFields] = useState<ILocationFieldMeta[]>(
-    []
-  );
-  const [numberFields, setNumberFields] = useState<INumberFieldMeta[]>([]);
+  const [locationFieldOptions, setLocationFieldOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [numberFieldOptions, setNumberFieldOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
   const [distanceType, setDistanceType] = useState<string>("direct");
 
   // Effect 1: 加载数据表列表和初始选中项
@@ -103,9 +97,8 @@ export default function App() {
   useEffect(() => {
     const fetchFields = async () => {
       if (!selectedTableId) {
-        setLocationFields([]);
-        setNumberFields([]);
-        // Ensure FormApi clears form values when available
+        setLocationFieldOptions([]);
+        setNumberFieldOptions([]);
         return;
       }
       setLoading(true);
@@ -113,21 +106,24 @@ export default function App() {
         const table = await bitable.base.getTableById(selectedTableId);
         const fieldMetaList = await table.getFieldMetaList();
 
-        const locFields = fieldMetaList.filter(
-          (field): field is ILocationFieldMeta =>
-            field.type === FieldType.Location
-        );
-        const numFields = fieldMetaList.filter(
-          (field): field is INumberFieldMeta => field.type === FieldType.Number
-        );
+        const locOptions: { label: string; value: string }[] = [];
+        const numOptions: { label: string; value: string }[] = [];
 
-        setLocationFields(locFields);
-        setNumberFields(numFields);
+        fieldMetaList.forEach((field) => {
+          if (field.type === FieldType.Location) {
+            locOptions.push({ label: field.name, value: field.id });
+          } else if (field.type === FieldType.Number) {
+            numOptions.push({ label: field.name, value: field.id });
+          }
+        });
+
+        setLocationFieldOptions(locOptions);
+        setNumberFieldOptions(numOptions);
       } catch (error) {
         console.error("Effect 2: Error fetching fields:", error);
         Toast.error(t("error_fetching_fields"));
-        setLocationFields([]);
-        setNumberFields([]);
+        setLocationFieldOptions([]);
+        setNumberFieldOptions([]);
       } finally {
         setLoading(false);
       }
@@ -474,7 +470,7 @@ export default function App() {
         }
       }
     },
-    [t, locationFields, numberFields]
+    [t]
   );
 
   return (
@@ -538,7 +534,7 @@ export default function App() {
             placeholder={t("select_latitude_field_placeholder")}
             style={{ width: "100%" }}
             rules={[{ required: true, message: t("field_required") }]}
-            optionList={fieldMetaToOptions(locationFields)}
+            optionList={locationFieldOptions}
             disabled={!selectedTableId}
           ></Form.Select>
           <Form.Select
@@ -547,7 +543,7 @@ export default function App() {
             placeholder={t("select_longitude_field_placeholder")}
             style={{ width: "100%" }}
             rules={[{ required: true, message: t("field_required") }]}
-            optionList={fieldMetaToOptions(locationFields)}
+            optionList={locationFieldOptions}
             disabled={!selectedTableId}
           ></Form.Select>
           <Form.Select
@@ -696,7 +692,7 @@ export default function App() {
             label={t("select_output_field_distance")}
             placeholder={t("select_output_field_distance_placeholder")}
             style={{ width: "100%" }}
-            optionList={[...fieldMetaToOptions(numberFields)]}
+            optionList={numberFieldOptions}
             disabled={!selectedTableId}
           ></Form.Select>
           <Form.Select
@@ -704,7 +700,7 @@ export default function App() {
             label={t("select_output_field_duration")}
             placeholder={t("select_output_field_duration_placeholder")}
             style={{ width: "100%" }}
-            optionList={[...fieldMetaToOptions(numberFields)]}
+            optionList={numberFieldOptions}
             disabled={!selectedTableId}
           ></Form.Select>
           <Form.Input
