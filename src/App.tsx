@@ -464,6 +464,11 @@ export default function App() {
             }
 
             // --- Add Delay After Each API Call in Inner Loop ---
+            const INNER_LOOP_DELAY = 50; // 50ms delay
+            await new Promise((resolve) =>
+              setTimeout(resolve, INNER_LOOP_DELAY)
+            );
+            // --- End Delay ---
           } // End inner loop (processing batch records)
 
           // Check stop status before batch update
