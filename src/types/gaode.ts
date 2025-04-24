@@ -40,6 +40,7 @@ export interface RoutePathCost {
  */
 export interface RoutePath {
   distance: number; // 距离，单位：米
+  duration?: string; // 总耗时，单位：秒 (从V5响应观察到)
   cost?: RoutePathCost; // 所需时间和开销信息
 }
 

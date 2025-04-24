@@ -4,7 +4,7 @@
 
 ⚡️ **简介**
 
-这是一个为[飞书多维表格](https://feishu.cn/product/base)设计的强大插件（使用 React 重构），可以帮助你轻松计算两个指定地理位置字段之间的距离和预估时间，并将结果自动写回表格。
+这是一个为[飞书多维表格](https://feishu.cn/product/base)设计的插件，可以帮助你轻松计算两个指定地理位置字段之间的距离和预估时间，并将结果自动写回表格。
 
 插件链接（基于 UIBuilder）：https://lq0ffyd8fx.feishu.cn/base/extension/replit_3efac8be7421a3e5
 

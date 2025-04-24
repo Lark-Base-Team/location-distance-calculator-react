@@ -325,12 +325,18 @@ export async function calculateDistance(
         drivingData.route.paths &&
         drivingData.route.paths.length > 0
       ) {
-        distance = drivingData.route.paths[0].distance
-          ? Number(drivingData.route.paths[0].distance) / 1000
+        const firstPath = drivingData.route.paths[0]; // Use variable for clarity
+        distance = firstPath.distance
+          ? Number(firstPath.distance) / 1000
           : null;
-        duration = drivingData.route.paths[0].cost?.duration
-          ? Number(drivingData.route.paths[0].cost.duration) / 60
+        // --- Start Duration Fix ---
+        // Prioritize path.duration, fallback to cost.duration if needed (though less likely based on example)
+        duration = firstPath.duration
+          ? Number(firstPath.duration) / 60
+          : firstPath.cost?.duration
+          ? Number(firstPath.cost.duration) / 60
           : null;
+        // --- End Duration Fix ---
       } else {
         // 即使 infocode 是 10000，也可能没有路径（例如无法到达）
         console.warn("驾车模式未返回有效路径数据");
@@ -356,13 +362,18 @@ export async function calculateDistance(
         walkingData.route.paths &&
         walkingData.route.paths.length > 0
       ) {
-        distance = walkingData.route.paths[0].distance
-          ? Number(walkingData.route.paths[0].distance) / 1000
+        const firstPath = walkingData.route.paths[0]; // Use variable
+        distance = firstPath.distance
+          ? Number(firstPath.distance) / 1000
           : null;
-        // Assuming V5 walking also uses cost.duration with show_fields=cost
-        duration = walkingData.route.paths[0].cost?.duration
-          ? Number(walkingData.route.paths[0].cost.duration) / 60
+        // --- Start Duration Fix ---
+        // Prioritize path.duration
+        duration = firstPath.duration
+          ? Number(firstPath.duration) / 60
+          : firstPath.cost?.duration // Keep fallback just in case API varies
+          ? Number(firstPath.cost.duration) / 60
           : null;
+        // --- End Duration Fix ---
       } else {
         console.warn("步行模式未返回有效路径数据");
       }
@@ -372,26 +383,42 @@ export async function calculateDistance(
       data = (await response.json()) as GaodeBicyclingV5Response;
       console.log("API Response:", data);
 
-      if (data.status !== "1" || data.infocode !== "10000") {
+      // -- Start modification --
+      // Check for specific non-critical error codes first
+      if (data.status === "1" && data.infocode === "30007") {
+        // RESULTS_ARE_EMPTY is not a critical failure, means no route found
+        console.warn(
+          `高德 API (v5 Bicycling) 提示: ${data.info} (infocode: ${data.infocode}) - 无骑行路径`
+        );
+        // Return nulls, don't throw error
+      } else if (data.status !== "1" || data.infocode !== "10000") {
+        // For other errors, throw
         throw new Error(
           `高德 API (v5 Bicycling) 错误: ${
             data.info || "未知错误"
           } (infocode: ${data.infocode})`
         );
       }
+      // -- End modification --
+
       const bicyclingData = data as GaodeBicyclingV5Response;
       if (
         bicyclingData.route &&
         bicyclingData.route.paths &&
         bicyclingData.route.paths.length > 0
       ) {
-        distance = bicyclingData.route.paths[0].distance
-          ? Number(bicyclingData.route.paths[0].distance) / 1000
+        const firstPath = bicyclingData.route.paths[0]; // Use variable
+        distance = firstPath.distance
+          ? Number(firstPath.distance) / 1000
           : null;
-        // Assuming V5 bicycling also uses cost.duration with show_fields=cost
-        duration = bicyclingData.route.paths[0].cost?.duration
-          ? Number(bicyclingData.route.paths[0].cost.duration) / 60
+        // --- Start Duration Fix ---
+        // Prioritize path.duration
+        duration = firstPath.duration
+          ? Number(firstPath.duration) / 60
+          : firstPath.cost?.duration // Keep fallback
+          ? Number(firstPath.cost.duration) / 60
           : null;
+        // --- End Duration Fix ---
       } else {
         console.warn("骑行模式未返回有效路径数据");
       }
