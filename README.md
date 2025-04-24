@@ -6,6 +6,15 @@
 
 插件链接：https://lq0ffyd8fx.feishu.cn/base/extension/replit_3efac8be7421a3e5
 
+## 📋 示例与指南
+
+- **示例多维表格:** [点击查看](https://lq0ffyd8fx.feishu.cn/base/HXBtbSS8zaERQ2svkfHcf2RsnTb?table=tblCe0djHFc8Kwen&view=vewHR920NB)
+- **使用指南:** [「地理位置距离计算」插件使用指南](https://fexakcngwi.feishu.cn/docx/TDb1dc7uIoD4IXx0QYHcn7yQnxb)
+
+## ✨ 演示
+
+![插件演示 GIF](assets/plugin-demo.gif)
+
 ## ✨ 功能特性
 
 - **灵活选择:** 支持选择当前 Base 中的任意数据表，并指定两个「地理位置」类型的字段作为起点和终点。
@@ -48,11 +57,6 @@
 4.  点击"开始计算"按钮。
 5.  插件将遍历表格记录，计算结果并自动填充到指定的字段中。
 
-## 📋 示例与指南
-
-- **示例多维表格:** [点击查看](https://lq0ffyd8fx.feishu.cn/base/HXBtbSS8zaERQ2svkfHcf2RsnTb?table=tblCe0djHFc8Kwen&view=vewHR920NB)
-- **使用指南:** [「地理位置距离计算」插件使用指南](https://fexakcngwi.feishu.cn/docx/TDb1dc7uIoD4IXx0QYHcn7yQnxb)
-
 ## 📝 待办事项
 
 - [ ] 优化 API Key 的管理方式，提高安全性。
@@ -67,5 +71,5 @@
     1.  访问 [高德开放平台](https://lbs.amap.com/)。
     2.  进入 **控制台** > **应用管理** > **我的应用**，点击 **创建新应用** （名称类型随意）。
     3.  在创建的应用下，点击 **添加 KEY**，输入 Key 名称（随意），服务平台选择 **Web 服务**。
-    4.  将获取到的 Key 填入插件界面的 “自定义高德 API Key” 输入框，插件将优先使用您的 Key。
+    4.  将获取到的 Key 填入插件界面的 "自定义高德 API Key" 输入框，插件将优先使用您的 Key。
 - **飞书插件开发:** 了解更多关于飞书多维表格插件开发，请查阅 [官方 JS SDK 文档](https://lark-base-team.github.io/js-sdk-docs/zh/)。
