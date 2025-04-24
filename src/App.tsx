@@ -64,10 +64,7 @@ export default function App() {
     []
   );
   const [numberFields, setNumberFields] = useState<INumberFieldMeta[]>([]);
-  // 恢复 distanceType state
-  const [distanceType, setDistanceType] = useState<string | undefined>(
-    undefined // 初始化为 undefined 或默认值
-  );
+  const [, forceUpdate] = useState({}); // Dummy state for forcing re-render
 
   // Effect 1: 加载数据表列表和初始选中项
   useEffect(() => {
@@ -156,6 +153,7 @@ export default function App() {
         outputField_distance: undefined,
         outputField_duration: undefined,
         // drivingStrategy: undefined, // 策略不清空，依赖 distanceType
+        // transitStrategy 不清空，保留用户选择或默认值
       });
     } else {
       // 清空 table 及相关字段
@@ -166,29 +164,14 @@ export default function App() {
         outputField_distance: undefined,
         outputField_duration: undefined,
         // drivingStrategy: undefined,
+        // transitStrategy: undefined,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTableId]); // 依赖 selectedTableId
 
   // Effect 4: 响应 distanceType 变化，更新表单并处理策略字段
-  useEffect(() => {
-    if (!formApi.current) return; // 确保 formApi 已初始化
-
-    console.log("Effect 4: distanceType changed to:", distanceType);
-
-    // 更新表单中的 distanceType 值
-    formApi.current.setValue("distanceType", distanceType);
-
-    // 如果不是驾车模式，清空策略
-    if (distanceType !== "driving") {
-      formApi.current.setValue("drivingStrategy", undefined);
-    } else {
-      // 当切换回驾车模式时，总是将策略重置为 "高德推荐"
-      formApi.current.setValue("drivingStrategy", "32");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [distanceType]); // 依赖 distanceType
+  // (已移除)
 
   // 更新 ref 当 isStopping 变化时
   useEffect(() => {
@@ -202,10 +185,7 @@ export default function App() {
   }, []);
 
   // handleDistanceTypeChange 只更新 state
-  const handleDistanceTypeChange = useCallback((value: any) => {
-    console.log("handleDistanceTypeChange called with:", value);
-    setDistanceType(value as string | undefined);
-  }, []);
+  // (已移除)
 
   // 请求停止处理
   const requestStop = useCallback(() => {
@@ -542,12 +522,19 @@ export default function App() {
             drivingStrategy: "32",
             transitStrategy: "0",
           }}
-          onValueChange={(values) => {
-            if (
-              values.distanceType !== undefined &&
-              values.distanceType !== distanceType
-            ) {
-              setDistanceType(values.distanceType);
+          onValueChange={(values, changedValues) => {
+            // --- Simplified state sync ---
+            if (changedValues.hasOwnProperty("distanceType")) {
+              const newDistanceType = values.distanceType;
+              console.log("Form distanceType changed to:", newDistanceType);
+              if (newDistanceType !== "driving") {
+                formApi.current?.setValue("drivingStrategy", undefined);
+              } else {
+                // 当切换回驾车模式时，总是将策略重置为 "高德推荐"
+                formApi.current?.setValue("drivingStrategy", "32");
+              }
+              // Force re-render to update conditional UI for strategies
+              forceUpdate({});
             }
           }}
         >
@@ -612,10 +599,9 @@ export default function App() {
               { label: t("bicycling", "骑行"), value: "bicycling" },
               { label: t("transit", "公交"), value: "transit" },
             ]}
-            onChange={handleDistanceTypeChange}
           ></Form.Select>
 
-          {distanceType === "driving" && (
+          {formApi.current?.getValues().distanceType === "driving" && (
             <Form.Select
               field="drivingStrategy"
               label={t("select_driving_strategy", "选择驾车策略")}
@@ -721,7 +707,7 @@ export default function App() {
             ></Form.Select>
           )}
 
-          {distanceType === "transit" && (
+          {formApi.current?.getValues().distanceType === "transit" && (
             <Form.Select
               field="transitStrategy"
               label={t("select_transit_strategy", "选择公交策略")}
