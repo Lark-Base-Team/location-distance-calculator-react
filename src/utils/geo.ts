@@ -10,6 +10,86 @@ export interface CalculateDistanceResult {
   duration: number | null; // 分钟
 }
 
+// --- Helper function to get citycode from city name using V3 Geocoding API ---
+async function getCitycodeFromCityName(
+  cityName: string,
+  apiKey: string
+): Promise<string | null> {
+  if (!cityName || cityName.trim() === "") {
+    console.error("[getCitycode] Invalid city name provided:", cityName);
+    return null;
+  }
+  // Simple cache to avoid repeated lookups for the same city in one run
+  if (
+    getCitycodeFromCityName.cache &&
+    getCitycodeFromCityName.cache[cityName]
+  ) {
+    console.log(`[getCitycode] Using cached citycode for ${cityName}`);
+    return getCitycodeFromCityName.cache[cityName];
+  }
+
+  const url = `https://restapi.amap.com/v3/geocode/geo?address=${encodeURIComponent(
+    cityName
+  )}&key=${apiKey}`;
+  console.log(
+    `[getCitycode] Requesting V3 Geocoding for "${cityName}" with URL:`,
+    url.replace(apiKey, "key=***")
+  );
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log(`[getCitycode] V3 Geocoding Response for "${cityName}":`, data);
+
+    if (data.status === "1" && data.geocodes && data.geocodes.length > 0) {
+      // --- Extract citycode instead of adcode ---
+      const citycode = data.geocodes[0].citycode;
+      if (typeof citycode === "string" && citycode.trim() !== "") {
+        if (!getCitycodeFromCityName.cache) {
+          getCitycodeFromCityName.cache = {};
+        }
+        getCitycodeFromCityName.cache[cityName] = citycode; // Cache the result
+        console.log(
+          `[getCitycode] Found citycode for "${cityName}": ${citycode}`
+        );
+        return citycode;
+      } else {
+        // Handle cases where citycode might be empty or not a string (though unlikely for city level query)
+        console.error(
+          `[getCitycode] Invalid or empty citycode received for "${cityName}":`,
+          citycode
+        );
+        // Fallback or specific error handling might be needed here
+        // Try returning adcode as a fallback? Or just null?
+        // Let's return null for now to stick to the citycode hypothesis.
+        return null;
+      }
+      // --- End extraction change ---
+    } else {
+      console.error(
+        `[getCitycode] Failed to get geocoding result for "${cityName}". API Info: ${
+          data.info || "Unknown error"
+        } (infocode: ${data.infocode})`
+      );
+      return null;
+    }
+  } catch (error) {
+    console.error(
+      `[getCitycode] Error fetching citycode for "${cityName}":`,
+      error
+    );
+    return null;
+  }
+}
+// Declare cache property on the function
+declare global {
+  interface Function {
+    cache?: { [key: string]: string };
+  }
+}
+
 /**
  * 使用高德地图 API 计算两点间的距离和时间
  * @param origin 起点经纬度 (格式："经度,纬度")
@@ -91,25 +171,65 @@ export async function calculateDistance(
       // console.log("[Transit URL Step 1] Added origin:", params_transit.join("&"));
       params_transit.push(`destination=${destination}`);
       // console.log("[Transit URL Step 2] Added destination:", params_transit.join("&"));
-      params_transit.push(`city=${encodeURIComponent(originCity)}`);
-      // console.log("[Transit URL Step 3] Added city:", params_transit.join("&"));
-      params_transit.push(`cityd=${encodeURIComponent(destinationCity)}`);
-      // console.log("[Transit URL Step 4] Added cityd:", params_transit.join("&"));
+
+      // --- Get citycodes for cities --- // UPDATED STEP
+      console.log("[Transit Citycode] Attempting to fetch citycodes...");
+      let originCitycode: string | null = null;
+      let destinationCitycode: string | null = null;
+
+      try {
+        // Use Promise.all to fetch citycodes concurrently
+        [originCitycode, destinationCitycode] = await Promise.all([
+          getCitycodeFromCityName(originCity, apiKey),
+          getCitycodeFromCityName(destinationCity, apiKey),
+        ]);
+      } catch (fetchError) {
+        console.error(
+          "[Transit Citycode] Error during Promise.all for citycode fetching:",
+          fetchError
+        );
+        throw new Error(
+          `获取起点或终点城市的 Citycode 失败: ${
+            fetchError instanceof Error
+              ? fetchError.message
+              : String(fetchError)
+          }`
+        );
+      }
+
+      console.log(
+        `[Transit Citycode] Fetched citycodes: origin=${originCitycode}, destination=${destinationCitycode}`
+      );
+
+      if (!originCitycode || !destinationCitycode) {
+        throw new Error(
+          `无法获取有效的起点 (${originCity}) 或终点 (${destinationCity}) 的 Citycode。请检查城市名称是否准确无误或 V3 Geocoding API 是否返回了有效的 citycode。` // Updated error message
+        );
+      }
+      // --- End Get citycodes --- //
+
+      // Use citycodes instead of adcodes/names
+      // AND use parameter names city1, city2 as per V5 Transit doc
+      params_transit.push(`city1=${originCitycode}`); // Use city1
+      params_transit.push(`city2=${destinationCitycode}`); // Use city2
+      // console.log("[Transit URL Step 3] Added city1 (citycode):", params_transit.join("&")); // Optional log update
+      // console.log("[Transit URL Step 4] Added city2 (citycode):", params_transit.join("&")); // Optional log update
+
       params_transit.push(keyParam); // keyParam should be "key=..."
-      // console.log("[Transit URL Step 5] Added keyParam:", params_transit.join("&").replace(apiKey, "key=***")); // Misleading log
       params_transit.push("show_fields=cost");
-      // console.log("[Transit URL Step 6] Added show_fields:", params_transit.join("&").replace(apiKey, "key=***")); // Misleading log
       if (strategy) {
         params_transit.push(`strategy=${strategy}`);
-        // console.log("[Transit URL Step 7] Added strategy:", params_transit.join("&").replace(apiKey, "key=***")); // Misleading log
       }
       const joinedParams = params_transit.join("&"); // Join explicitly
       console.log(
-        "[Transit URL Joined] Joined params string (raw):",
-        joinedParams
+        "[Transit URL Joined] Joined params string (raw, using citycodes):", // Updated log
+        joinedParams.replace(apiKey, "key=***") // Mask key in log
       ); // Log joined string raw
       url = `${baseUrl_transit}?${joinedParams}`; // Assign joined string
-      console.log("[Transit URL Final Raw] Final URL before fetch (raw):", url); // Log raw final URL before fetch
+      console.log(
+        "[Transit URL Final Raw] Final URL before fetch (using citycodes):",
+        url.replace(apiKey, "key=***")
+      ); // Log raw final URL before fetch // Updated log
       // ---- End Manual URL Construction ----
 
       // url = `https://restapi.amap.com/v5/direction/transit/integrated?origin=${origin}&destination=${destination}&city=${encodeURIComponent(
@@ -252,12 +372,16 @@ export async function calculateDistance(
         // Try cost.duration first if available (from show_fields=cost)
         duration = firstTransit.cost?.duration
           ? Number(firstTransit.cost.duration) / 60
-          : firstTransit.duration
+          : firstTransit.duration // Fallback check
           ? Number(firstTransit.duration) / 60
           : null;
-        // V5 might provide distance differently, maybe in cost or path? For now, keep it null or based on V3 structure if needed.
-        // distance = firstTransit.distance ? Number(firstTransit.distance) / 1000 : null;
-        distance = null; // Set distance to null for transit by default
+        // V5 might provide distance differently... For now, keep it null...
+        // distance = firstTransit.distance ? Number(firstTransit.distance) / 1000 : null; // 这行之前被注释掉了
+        // --- Extract distance from transit object as per V5 doc --- // NEW
+        distance = firstTransit.distance
+          ? Number(firstTransit.distance) / 1000 // Convert meters to kilometers
+          : null;
+        // --- End distance extraction ---
       } else {
         console.warn("公交模式未返回有效路径数据");
       }
