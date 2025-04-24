@@ -61,6 +61,10 @@
 
 - [ ] 优化 API Key 的管理方式，提高安全性。
 
+## 🤝 联系我 (Contact Me)
+
+如有问题或建议，欢迎通过飞书联系我：[加我飞书好友](https://www.feishu.cn/invitation/page/add_contact/?token=df298630-8825-4dd9-9d14-c4a5f683020f)
+
 ## 💡 注意
 
 - **范围限制:** 本插件计算范围目前仅支持中国大陆内的地理位置。
