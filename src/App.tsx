@@ -21,10 +21,11 @@ import {
   Toast,
   Notification,
   Input,
+  Typography,
 } from "@douyinfe/semi-ui";
 import { BaseFormApi } from "@douyinfe/semi-foundation/lib/es/form/interface";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useTranslation } from "react-i18next";
+import { useTranslation, Trans } from "react-i18next";
 import {
   calculateDistance,
   DEFAULT_API_KEY,
@@ -508,6 +509,22 @@ export default function App() {
 
   return (
     <main className="main">
+      {/* Use two Paragraphs for description and link */}
+      <Typography.Paragraph type="secondary" style={{ marginBottom: "4px" }}>
+        {" "}
+        {/* Reduced bottom margin */}
+        {t("app_title_description")}
+      </Typography.Paragraph>
+      <Typography.Paragraph type="secondary" style={{ marginBottom: "16px" }}>
+        <a
+          href="https://fexakcngwi.feishu.cn/docx/TDb1dc7uIoD4IXx0QYHcn7yQnxb"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {t("link_demo_usage")}
+        </a>
+      </Typography.Paragraph>
+
       <Spin spinning={loading} tip={t("processing_data")}>
         <Form<FormValues>
           labelPosition="top"
@@ -534,10 +551,6 @@ export default function App() {
             }
           }}
         >
-          <Form.Slot>
-            <p>{t("text_description")}</p>
-            <p>{t("text_description_2")}</p>
-          </Form.Slot>
           <Form.Select
             field="table"
             label={t("select_table")}

@@ -69,5 +69,7 @@
   "custom_api_key_label": "Custom Amap API Key",
   "custom_api_key_placeholder": "If you encounter API limit errors, you can configure your own Amap API Key",
   "submit": "Start Calculation",
-  "stop": "Stop"
+  "stop": "Stop",
+  "app_title_description": "🚗 Batch calculate distances and travel times between locations using various transport modes",
+  "link_demo_usage": "👉 Demo & Usage Instructions"
 }
