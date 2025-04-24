@@ -38,6 +38,7 @@ interface FormValues {
   longitudeField?: string;
   distanceType?: string;
   drivingStrategy?: string;
+  transitStrategy?: string;
   outputField_distance?: string;
   outputField_duration?: string;
   customApiKey?: string;
@@ -352,6 +353,14 @@ export default function App() {
               const originCity = startCell.cityname;
               const destinationCity = endCell.cityname;
 
+              // --- Log city names for transit mode ---
+              if (values.distanceType === "transit") {
+                console.log(
+                  `Record ${recordId}: Transit calculation - Origin City: '${originCity}', Destination City: '${destinationCity}'`
+                );
+              }
+              // --- End log ---
+
               // 调用 calculateDistance
               const result: CalculateDistanceResult = await calculateDistance(
                 originString,
@@ -360,7 +369,11 @@ export default function App() {
                 destinationCity,
                 values.distanceType!,
                 apiKey,
-                values.drivingStrategy
+                values.distanceType === "driving"
+                  ? values.drivingStrategy
+                  : values.distanceType === "transit"
+                  ? values.transitStrategy
+                  : undefined
               );
 
               const recordUpdateFields: Record<string, any> = {};
@@ -477,7 +490,11 @@ export default function App() {
           labelPosition="top"
           onSubmit={handleSubmit}
           getFormApi={(api) => (formApi.current = api)}
-          initValues={{ distanceType: "driving", drivingStrategy: "32" }}
+          initValues={{
+            distanceType: "driving",
+            drivingStrategy: "32",
+            transitStrategy: "0",
+          }}
           onValueChange={(values) => {
             if (
               values.distanceType !== undefined &&
@@ -562,16 +579,22 @@ export default function App() {
               style={{ width: "100%" }}
               optionList={[
                 {
-                  label: t("driving_strategy_fastest", "速度优先"),
+                  label: t("driving_strategy_speed_priority", "速度优先"),
                   value: "0",
                 },
-                { label: t("driving_strategy_cost", "费用优先"), value: "1" },
                 {
-                  label: t("driving_strategy_shortest", "距离最短"),
+                  label: t("driving_strategy_cost_priority", "费用优先"),
+                  value: "1",
+                },
+                {
+                  label: t("driving_strategy_conventional_fastest", "常规最快"),
                   value: "2",
                 },
                 {
-                  label: t("driving_strategy_default", "高德推荐"),
+                  label: t(
+                    "driving_strategy_amap_recommended",
+                    "高德推荐 (默认)"
+                  ),
                   value: "32",
                 },
                 {
@@ -579,12 +602,122 @@ export default function App() {
                   value: "33",
                 },
                 {
+                  label: t("driving_strategy_highway_priority", "高速优先"),
+                  value: "34",
+                },
+                {
                   label: t("driving_strategy_avoid_highway", "不走高速"),
                   value: "35",
                 },
                 {
-                  label: t("driving_strategy_highway_priority", "高速优先"),
-                  value: "34",
+                  label: t("driving_strategy_less_charge", "少收费"),
+                  value: "36",
+                },
+                {
+                  label: t("driving_strategy_main_road", "大路优先"),
+                  value: "37",
+                },
+                {
+                  label: t("driving_strategy_speed_fastest", "速度最快"),
+                  value: "38",
+                },
+                {
+                  label: t(
+                    "driving_strategy_avoid_congestion_highway_priority",
+                    "躲避拥堵+高速优先"
+                  ),
+                  value: "39",
+                },
+                {
+                  label: t(
+                    "driving_strategy_avoid_congestion_avoid_highway",
+                    "躲避拥堵+不走高速"
+                  ),
+                  value: "40",
+                },
+                {
+                  label: t(
+                    "driving_strategy_avoid_congestion_less_charge",
+                    "躲避拥堵+少收费"
+                  ),
+                  value: "41",
+                },
+                {
+                  label: t(
+                    "driving_strategy_less_charge_avoid_highway",
+                    "少收费+不走高速"
+                  ),
+                  value: "42",
+                },
+                {
+                  label: t(
+                    "driving_strategy_avoid_congestion_less_charge_avoid_highway",
+                    "躲避拥堵+少收费+不走高速"
+                  ),
+                  value: "43",
+                },
+                {
+                  label: t(
+                    "driving_strategy_avoid_congestion_main_road",
+                    "躲避拥堵+大路优先"
+                  ),
+                  value: "44",
+                },
+                {
+                  label: t(
+                    "driving_strategy_avoid_congestion_speed_fastest",
+                    "躲避拥堵+速度最快"
+                  ),
+                  value: "45",
+                },
+              ]}
+            ></Form.Select>
+          )}
+
+          {distanceType === "transit" && (
+            <Form.Select
+              field="transitStrategy"
+              label={t("select_transit_strategy", "选择公交策略")}
+              placeholder={t(
+                "select_transit_strategy_placeholder",
+                "选择公交路线偏好"
+              )}
+              style={{ width: "100%" }}
+              optionList={[
+                {
+                  label: t("transit_strategy_recommend_v5", "推荐模式 (默认)"),
+                  value: "0",
+                },
+                {
+                  label: t("transit_strategy_cheapest", "最经济模式"),
+                  value: "1",
+                },
+                {
+                  label: t("transit_strategy_least_transfer", "最少换乘模式"),
+                  value: "2",
+                },
+                {
+                  label: t("transit_strategy_least_walk", "最少步行模式"),
+                  value: "3",
+                },
+                {
+                  label: t("transit_strategy_most_comfortable", "最舒适模式"),
+                  value: "4",
+                },
+                {
+                  label: t("transit_strategy_no_subway", "不乘地铁模式"),
+                  value: "5",
+                },
+                {
+                  label: t(
+                    "transit_strategy_subway_priority_v5",
+                    "地铁优先模式"
+                  ),
+                  value: "7",
+                },
+                {
+                  label: t("transit_strategy_shortest_time", "时间短模式"),
+                  value: "8",
                 },
               ]}
             ></Form.Select>

@@ -31,8 +31,22 @@ export async function calculateDistance(
   apiKey: string = DEFAULT_API_KEY, // 默认使用内置 Key
   strategy?: string // 设为可选
 ): Promise<CalculateDistanceResult> {
+  // --- Log input parameters ---
+  console.log(`calculateDistance called with:
+  origin: "${origin}"
+  destination: "${destination}"
+  originCity: "${originCity}"
+  destinationCity: "${destinationCity}"
+  mode: "${mode}"
+  strategy: "${strategy}"
+  apiKey: "${apiKey ? apiKey.substring(0, 5) + "..." : "N/A"}"`);
+  // --- End log ---
+
   let url: string;
-  const keyParam = `key=${apiKey}`;
+  // Ensure keyParam doesn't duplicate "key=" if apiKey already contains it
+  const keyParam = apiKey.toLowerCase().startsWith("key=")
+    ? apiKey
+    : `key=${apiKey}`;
 
   // 根据不同的出行方式选择不同的API
   switch (mode) {
@@ -45,29 +59,87 @@ export async function calculateDistance(
         url += `&strategy=${strategy}`;
       }
       break;
-    case "walking": // 步行路径规划 v3 (注意：文档中距离API type=1，但步行路径规划API是另一个)
-      // 为了与原项目行为一致，继续使用 v3 distance API type=3 (步行)
-      // url = `https://restapi.amap.com/v3/direction/walking?origin=${origin}&destination=${destination}&${keyParam}`;
-      url = `https://restapi.amap.com/v3/distance?type=3&origins=${origin}&destination=${destination}&${keyParam}`;
+    case "walking": // 步行路径规划 v5 (Updated)
+      // url = `https://restapi.amap.com/v3/distance?type=3&origins=${origin}&destination=${destination}&${keyParam}`;
+      url = `https://restapi.amap.com/v5/direction/walking?origin=${origin}&destination=${destination}&${keyParam}&show_fields=cost`; // Updated URL to V5 and added show_fields
       break;
-    case "bicycling": // 骑行路径规划 v4
-      url = `https://restapi.amap.com/v4/direction/bicycling?origin=${origin}&destination=${destination}&${keyParam}`;
+    case "bicycling": // 骑行路径规划 v5 (Updated)
+      // url = `https://restapi.amap.com/v4/direction/bicycling?origin=${origin}&destination=${destination}&${keyParam}`;
+      url = `https://restapi.amap.com/v5/direction/bicycling?origin=${origin}&destination=${destination}&${keyParam}&show_fields=cost`; // Updated URL to V5 and added show_fields
       break;
-    case "transit": // 公交路径规划 v3
-      if (!originCity || !destinationCity) {
-        throw new Error("公交模式需要提供起点和终点城市名称。");
+    case "transit": // 公交路径规划 v5 (Updated)
+      // Improved check: Ensure city names are not null, undefined, or empty strings
+      if (
+        !originCity ||
+        originCity.trim() === "" ||
+        !destinationCity ||
+        destinationCity.trim() === ""
+      ) {
+        // Include the actual city names in the error for better debugging
+        throw new Error(
+          `公交模式需要有效的起点和终点城市名称。实际获取到的起点城市: "${originCity}", 终点城市: "${destinationCity}"`
+        );
       }
-      url = `https://restapi.amap.com/v3/direction/transit/integrated?origin=${origin}&destination=${destination}&city=${encodeURIComponent(
-        originCity
-      )}&cityd=${encodeURIComponent(destinationCity)}&${keyParam}`;
+      // url = `https://restapi.amap.com/v3/direction/transit/integrated?origin=${origin}&destination=${destination}&city=${encodeURIComponent(
+      //  originCity
+      // )}&cityd=${encodeURIComponent(destinationCity)}&${keyParam}`;
+      // ---- Start Manual URL Construction with Logging ----
+      const baseUrl_transit =
+        "https://restapi.amap.com/v5/direction/transit/integrated";
+      const params_transit = [];
+      params_transit.push(`origin=${origin}`);
+      // console.log("[Transit URL Step 1] Added origin:", params_transit.join("&"));
+      params_transit.push(`destination=${destination}`);
+      // console.log("[Transit URL Step 2] Added destination:", params_transit.join("&"));
+      params_transit.push(`city=${encodeURIComponent(originCity)}`);
+      // console.log("[Transit URL Step 3] Added city:", params_transit.join("&"));
+      params_transit.push(`cityd=${encodeURIComponent(destinationCity)}`);
+      // console.log("[Transit URL Step 4] Added cityd:", params_transit.join("&"));
+      params_transit.push(keyParam); // keyParam should be "key=..."
+      // console.log("[Transit URL Step 5] Added keyParam:", params_transit.join("&").replace(apiKey, "key=***")); // Misleading log
+      params_transit.push("show_fields=cost");
+      // console.log("[Transit URL Step 6] Added show_fields:", params_transit.join("&").replace(apiKey, "key=***")); // Misleading log
+      if (strategy) {
+        params_transit.push(`strategy=${strategy}`);
+        // console.log("[Transit URL Step 7] Added strategy:", params_transit.join("&").replace(apiKey, "key=***")); // Misleading log
+      }
+      const joinedParams = params_transit.join("&"); // Join explicitly
+      console.log(
+        "[Transit URL Joined] Joined params string (raw):",
+        joinedParams
+      ); // Log joined string raw
+      url = `${baseUrl_transit}?${joinedParams}`; // Assign joined string
+      console.log("[Transit URL Final Raw] Final URL before fetch (raw):", url); // Log raw final URL before fetch
+      // ---- End Manual URL Construction ----
+
+      // url = `https://restapi.amap.com/v5/direction/transit/integrated?origin=${origin}&destination=${destination}&city=${encodeURIComponent(
+      //   originCity
+      // )}&cityd=${encodeURIComponent(
+      //   destinationCity
+      // )}&${keyParam}&show_fields=cost`; // Updated URL to V5 and added show_fields
+      // // TODO: Add transit strategy parameter when implemented in UI
+      // // Use the passed strategy if mode is transit
+      // if (strategy) {
+      //   url += `&strategy=${strategy}`;
+      // }
       break;
     default:
       throw new Error(`Unknown mode: ${mode}`);
   }
 
-  console.log("Requesting API:", url.replace(apiKey, "***")); // 打印 URL，隐藏 Key
+  // --- Log added for city name verification ---
+  if (mode === "transit") {
+    console.log(
+      `[Transit City Check] Raw cities before encoding: originCity="${originCity}", destinationCity="${destinationCity}"`
+    );
+  }
+  // --- End log ---
+
+  console.log("Requesting API (raw URL):", url); // 打印 URL，不再隐藏 Key
 
   try {
+    // Log the URL again immediately before fetch
+    console.log("URL passed to fetch:", url);
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -78,22 +150,24 @@ export async function calculateDistance(
     let distance: number | null = null;
     let duration: number | null = null;
 
-    // --- v3 Distance API (direct, walking) ---
-    if (mode === "direct" || mode === "walking") {
+    // --- v3 Distance API (direct only) ---
+    if (mode === "direct") {
+      // Removed walking from this block
       if (data.status !== "1" || !data.results || data.results.length === 0) {
         // status 为 0 也可能表示失败，info 会提供原因
         throw new Error(
-          `高德 API (v3) 错误: ${data.info || "未知错误"} (infocode: ${
+          `高德 API (v3 Distance) 错误: ${data.info || "未知错误"} (infocode: ${
             data.infocode
-          })`
+          })` // Updated error message slightly
         );
       }
       distance = data.results[0].distance
         ? Number(data.results[0].distance) / 1000
         : null;
+      // V3 Distance API 'direct' (type=0) might not return duration, set to null
       duration = data.results[0].duration
         ? Number(data.results[0].duration) / 60
-        : null;
+        : null; // Keep duration parsing for now, maybe type=0 provides it?
     }
     // --- v5 Driving API ---
     else if (mode === "driving") {
@@ -119,44 +193,71 @@ export async function calculateDistance(
         // throw new Error('驾车模式未返回有效路径数据');
       }
     }
-    // --- v4 Bicycling API ---
-    else if (mode === "bicycling") {
-      // v4版本 errcode=0 代表成功
-      if (data.errcode !== 0) {
+    // --- v5 Walking API (New block) ---
+    else if (mode === "walking") {
+      if (data.status !== "1" || data.infocode !== "10000") {
         throw new Error(
-          `高德 API (v4 Bicycling) 错误: ${
-            data.errdetail || data.errmsg || "未知错误"
-          } (errcode: ${data.errcode})`
+          `高德 API (v5 Walking) 错误: ${data.info || "未知错误"} (infocode: ${
+            data.infocode
+          })`
         );
       }
-      if (data.data && data.data.paths && data.data.paths.length > 0) {
-        distance = data.data.paths[0].distance
-          ? Number(data.data.paths[0].distance) / 1000
+      if (data.route && data.route.paths && data.route.paths.length > 0) {
+        distance = data.route.paths[0].distance
+          ? Number(data.route.paths[0].distance) / 1000
           : null;
-        duration = data.data.paths[0].duration
-          ? Number(data.data.paths[0].duration) / 60
+        // Assuming V5 walking also uses cost.duration with show_fields=cost
+        duration = data.route.paths[0].cost?.duration
+          ? Number(data.route.paths[0].cost.duration) / 60
+          : null;
+      } else {
+        console.warn("步行模式未返回有效路径数据");
+      }
+    }
+    // --- v5 Bicycling API (New block) ---
+    else if (mode === "bicycling") {
+      if (data.status !== "1" || data.infocode !== "10000") {
+        throw new Error(
+          `高德 API (v5 Bicycling) 错误: ${
+            data.info || "未知错误"
+          } (infocode: ${data.infocode})`
+        );
+      }
+      if (data.route && data.route.paths && data.route.paths.length > 0) {
+        distance = data.route.paths[0].distance
+          ? Number(data.route.paths[0].distance) / 1000
+          : null;
+        // Assuming V5 bicycling also uses cost.duration with show_fields=cost
+        duration = data.route.paths[0].cost?.duration
+          ? Number(data.route.paths[0].cost.duration) / 60
           : null;
       } else {
         console.warn("骑行模式未返回有效路径数据");
       }
     }
-    // --- v3 Transit API ---
+    // --- v3 Transit API --- (Updated to V5 parsing logic)
     else if (mode === "transit") {
       if (data.status !== "1" || data.infocode !== "10000") {
+        // Use V5 success check
         throw new Error(
-          `高德 API (v3 Transit) 错误: ${data.info || "未知错误"} (infocode: ${
+          `高德 API (v5 Transit) 错误: ${data.info || "未知错误"} (infocode: ${
             data.infocode
-          })`
+          })` // Updated error message to V5
         );
       }
+      // Assuming V5 structure is similar to V3 for transits, but check docs if issues arise.
       if (data.route && data.route.transits && data.route.transits.length > 0) {
-        // 公交通常只关心总耗时，距离可能包含步行距离等，根据需求调整
-        // distance = data.route.transits[0].distance ? Number(data.route.transits[0].distance) / 1000 : null;
-        duration = data.route.transits[0].duration
-          ? Number(data.route.transits[0].duration) / 60
+        const firstTransit = data.route.transits[0];
+        // 公交通常只关心总耗时
+        // Try cost.duration first if available (from show_fields=cost)
+        duration = firstTransit.cost?.duration
+          ? Number(firstTransit.cost.duration) / 60
+          : firstTransit.duration
+          ? Number(firstTransit.duration) / 60
           : null;
-        // 如果需要总距离，可以累加 segments 的 distance
-        // distance = data.route.transits[0].segments.reduce((sum, seg) => sum + Number(seg.distance || 0), 0) / 1000;
+        // V5 might provide distance differently, maybe in cost or path? For now, keep it null or based on V3 structure if needed.
+        // distance = firstTransit.distance ? Number(firstTransit.distance) / 1000 : null;
+        distance = null; // Set distance to null for transit by default
       } else {
         console.warn("公交模式未返回有效路径数据");
       }
